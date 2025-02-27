@@ -7,16 +7,21 @@ import {
     FlatList,
     Dimensions,
     Platform,
+    TouchableOpacity,
 } from 'react-native';
-import { Restaurant } from '../types';
+import { Restaurant, Location } from '../types';
 import { COLORS } from '../constants/colors';
 import { FontAwesome } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface RestaurantListProps {
     restaurants: Restaurant[];
+    userLocation: Location;
 }
 
-const RestaurantCard: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) => {
+const RestaurantCard: React.FC<{ restaurant: Restaurant, userLocation: Location }> = ({ restaurant, userLocation }) => {
+    const navigation = useNavigation();
+
     const renderRatingStars = (rating?: number) => {
         if (!rating) return null;
 
@@ -56,8 +61,19 @@ const RestaurantCard: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) =>
         );
     };
 
+    const handlePress = () => {
+        navigation.navigate('RestaurantDetail', {
+            restaurant,
+            userLocation
+        });
+    };
+
     return (
-        <View style={styles.card}>
+        <TouchableOpacity
+            style={styles.card}
+            onPress={handlePress}
+            activeOpacity={0.7}
+        >
             <Image
                 source={
                     restaurant.photoUrl
@@ -98,16 +114,16 @@ const RestaurantCard: React.FC<{ restaurant: Restaurant }> = ({ restaurant }) =>
                     )}
                 </View>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 };
 
-export const RestaurantList: React.FC<RestaurantListProps> = ({ restaurants }) => {
+export const RestaurantList: React.FC<RestaurantListProps> = ({ restaurants, userLocation }) => {
     return (
         <FlatList
             data={restaurants}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <RestaurantCard restaurant={item} />}
+            renderItem={({ item }) => <RestaurantCard restaurant={item} userLocation={userLocation} />}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
         />

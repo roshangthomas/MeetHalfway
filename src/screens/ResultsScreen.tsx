@@ -22,7 +22,10 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route }) => {
                         midpoint={midpointLocation}
                         restaurants={restaurants}
                     />
-                    <RestaurantList restaurants={restaurants} />
+                    <RestaurantList
+                        restaurants={restaurants}
+                        userLocation={userLocation}
+                    />
                 </View>
             </ScrollView>
         </SafeAreaView>

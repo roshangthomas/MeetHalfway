@@ -54,3 +54,23 @@ yarn-error.*
 
 # build
 build/
+
+# Temporary files
+*.log
+.tmp/
+tmp/
+
+# Expo OTA updates
+.expo-shared/
+
+# Android/IntelliJ
+android/.gradle
+android/captures/
+android/local.properties
+android/app/release/
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/*.xcodeproj/xcuserdata
