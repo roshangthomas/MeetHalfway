@@ -2,6 +2,11 @@
 
 # dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# testing
+coverage/
 
 # Expo
 .expo/
@@ -40,3 +45,12 @@ yarn-error.*
 
 #cursor
 .cursorrules
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# build
+build/

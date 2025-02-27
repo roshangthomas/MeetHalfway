@@ -23,31 +23,17 @@ A React Native app that helps two people find restaurants at a convenient midpoi
   - Directions API
   - Geocoding API
 
-## Setup
+## Setup Instructions
 
-1. Clone the repository:
-   ```bash
-   git clone [repository-url]
-   cd MeetHalfway
-   ```
+1. Clone the repository
+2. Copy `.env.example` to `.env`
+3. Add your API keys to `.env`
+4. Run `npm install`
+5. Start the project with `npm start`
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Create a `.env` file in the root directory with your Google API key:
-   ```
-   GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
-   ```
-   Note: The same API key is used for all Google services (Maps, Places, Directions, and Geocoding)
-
-4. Start the development server:
-   ```bash
-   npx expo start
-   ```
-
-5. Press 'i' for iOS simulator or 'a' for Android emulator
+## Environment Variables Required:
+- GOOGLE_MAPS_API_KEY
+- GOOGLE_PLACES_API_KEY
 
 ## Location Permissions
 
