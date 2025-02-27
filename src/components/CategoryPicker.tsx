@@ -1,0 +1,132 @@
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { PlaceCategory, PLACE_CATEGORY_LABELS, MIN_CATEGORIES, MAX_CATEGORIES } from '../types';
+import { COLORS } from '../constants/colors';
+
+interface CategoryPickerProps {
+    selectedCategories: PlaceCategory[];
+    onCategoriesChange: (categories: PlaceCategory[]) => void;
+}
+
+export const CategoryPicker: React.FC<CategoryPickerProps> = ({
+    selectedCategories,
+    onCategoriesChange,
+}) => {
+    const categories = Object.keys(PLACE_CATEGORY_LABELS) as PlaceCategory[];
+
+    const handleToggleCategory = (category: PlaceCategory) => {
+        if (selectedCategories.includes(category)) {
+            // Don't allow deselecting if we're at minimum categories
+            if (selectedCategories.length > MIN_CATEGORIES) {
+                onCategoriesChange(selectedCategories.filter(c => c !== category));
+            }
+        } else {
+            // Don't allow selecting if we're at maximum categories
+            if (selectedCategories.length < MAX_CATEGORIES) {
+                onCategoriesChange([...selectedCategories, category]);
+            }
+        }
+    };
+
+    return (
+        <View style={styles.container}>
+            <View style={styles.headerContainer}>
+                <Text style={styles.label}>I'm looking for...</Text>
+                <Text style={styles.subtitle}>
+                    Select up to {MAX_CATEGORIES} options
+                </Text>
+            </View>
+            <View style={styles.categoryGrid}>
+                {categories.map((category) => (
+                    <TouchableOpacity
+                        key={category}
+                        style={[
+                            styles.categoryButton,
+                            selectedCategories.includes(category) && styles.selectedCategory,
+                            selectedCategories.length >= MAX_CATEGORIES &&
+                            !selectedCategories.includes(category) &&
+                            styles.disabledCategory,
+                        ]}
+                        onPress={() => handleToggleCategory(category)}
+                        disabled={selectedCategories.length >= MAX_CATEGORIES && !selectedCategories.includes(category)}
+                    >
+                        <Text
+                            style={[
+                                styles.categoryText,
+                                selectedCategories.includes(category) && styles.selectedCategoryText,
+                                selectedCategories.length >= MAX_CATEGORIES &&
+                                !selectedCategories.includes(category) &&
+                                styles.disabledCategoryText,
+                            ]}
+                        >
+                            {PLACE_CATEGORY_LABELS[category]}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: {
+        marginBottom: 16,
+    },
+    headerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        marginBottom: 12,
+        marginHorizontal: 4,
+    },
+    label: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.TEXT,
+    },
+    subtitle: {
+        fontSize: 12,
+        color: COLORS.TEXT_SECONDARY,
+        fontStyle: 'italic',
+    },
+    categoryGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    categoryButton: {
+        flexBasis: '48%',
+        backgroundColor: COLORS.SURFACE,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: COLORS.TEXT,
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    selectedCategory: {
+        backgroundColor: COLORS.PRIMARY,
+    },
+    disabledCategory: {
+        opacity: 0.5,
+    },
+    categoryText: {
+        fontSize: 13,
+        color: COLORS.TEXT,
+        textAlign: 'center',
+    },
+    selectedCategoryText: {
+        color: COLORS.SURFACE,
+        fontWeight: '600',
+    },
+    disabledCategoryText: {
+        color: COLORS.TEXT_SECONDARY,
+    },
+}); 
