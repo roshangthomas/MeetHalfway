@@ -79,9 +79,10 @@ export const Map = forwardRef(MapComponent);
 
 const styles = StyleSheet.create({
     container: {
-        height: Dimensions.get('window').height * 0.4,
+        height: Dimensions.get('window').height * 0.45,
         width: '100%',
-        marginBottom: 20,
+        marginTop: 0,
+        marginBottom: 16,
         borderRadius: 16,
         overflow: 'hidden',
         shadowColor: COLORS.TEXT,

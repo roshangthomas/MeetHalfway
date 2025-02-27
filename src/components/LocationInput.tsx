@@ -42,8 +42,11 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     }, [value]);
 
     const handleSelectPrediction = (prediction: string) => {
-        onChangeText(prediction);
-        setShowPredictions(false);
+        // Add a small delay to ensure the touch event completes properly
+        requestAnimationFrame(() => {
+            onChangeText(prediction);
+            setShowPredictions(false);
+        });
     };
 
     return (
@@ -61,7 +64,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
             {showPredictions && predictions.length > 0 && (
                 <View style={styles.predictionsContainer}>
                     <ScrollView
-                        keyboardShouldPersistTaps="handled"
+                        keyboardShouldPersistTaps="always"
                         style={styles.scrollView}
                         nestedScrollEnabled={true}
                     >
@@ -70,6 +73,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                                 key={prediction.place_id}
                                 style={styles.predictionItem}
                                 onPress={() => handleSelectPrediction(prediction.description)}
+                                activeOpacity={0.7}
                             >
                                 <Text style={styles.predictionText}>
                                     {prediction.description}

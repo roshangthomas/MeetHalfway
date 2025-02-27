@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapViewWrapper from './src/components/MapViewWrapper';
+import { Marker } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -14,6 +15,7 @@ import { CategoryPicker } from './src/components/CategoryPicker';
 import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { mockPlaces } from './src/data/mockPlaces';
 import { ResultsScreen } from './src/screens/ResultsScreen';
+import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -91,7 +93,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
           <View style={styles.content}>
             {userLocation && (
               <View style={styles.mapContainer}>
-                <MapView
+                <MapViewWrapper
                   style={styles.map}
                   region={mapRegion}
                 >
@@ -104,7 +106,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
                       title="Your Location"
                     />
                   )}
-                </MapView>
+                </MapViewWrapper>
               </View>
             )}
 
@@ -160,6 +162,11 @@ export default function App() {
           name="Results"
           component={ResultsScreen}
           options={{ title: 'Meeting Places' }}
+        />
+        <Stack.Screen
+          name="RestaurantDetail"
+          component={RestaurantDetailScreen}
+          options={({ route }) => ({ title: route.params.restaurant.name })}
         />
       </Stack.Navigator>
     </NavigationContainer>
