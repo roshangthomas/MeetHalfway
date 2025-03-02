@@ -76,6 +76,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         userLocation,
         partnerLocation: partnerLoc,
         midpointLocation: midpoint,
+        travelMode: travelMode,
       });
 
     } catch (error) {
