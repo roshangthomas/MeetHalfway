@@ -42,9 +42,11 @@ export type RootStackParamList = {
         userLocation: Location;
         partnerLocation: Location;
         midpointLocation: Location;
+        travelMode: TravelMode;
     };
     RestaurantDetail: {
         restaurant: Restaurant;
         userLocation: Location;
+        travelMode?: TravelMode;
     };
 }; 

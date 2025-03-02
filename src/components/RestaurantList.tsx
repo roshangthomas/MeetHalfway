@@ -9,18 +9,20 @@ import {
     Platform,
     TouchableOpacity,
 } from 'react-native';
-import { Restaurant, Location } from '../types';
+import { Restaurant, Location, TravelMode } from '../types';
 import { COLORS } from '../constants/colors';
 import { FontAwesome } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../types';
 
 interface RestaurantListProps {
     restaurants: Restaurant[];
     userLocation: Location;
+    travelMode?: TravelMode;
 }
 
-const RestaurantCard: React.FC<{ restaurant: Restaurant, userLocation: Location }> = ({ restaurant, userLocation }) => {
-    const navigation = useNavigation();
+const RestaurantCard: React.FC<{ restaurant: Restaurant, userLocation: Location, travelMode?: TravelMode }> = ({ restaurant, userLocation, travelMode }) => {
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
     const renderRatingStars = (rating?: number) => {
         if (!rating) return null;
@@ -64,7 +66,8 @@ const RestaurantCard: React.FC<{ restaurant: Restaurant, userLocation: Location 
     const handlePress = () => {
         navigation.navigate('RestaurantDetail', {
             restaurant,
-            userLocation
+            userLocation,
+            travelMode
         });
     };
 
@@ -118,12 +121,18 @@ const RestaurantCard: React.FC<{ restaurant: Restaurant, userLocation: Location 
     );
 };
 
-export const RestaurantList: React.FC<RestaurantListProps> = ({ restaurants, userLocation }) => {
+export const RestaurantList: React.FC<RestaurantListProps> = ({ restaurants, userLocation, travelMode }) => {
     return (
         <FlatList
             data={restaurants}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <RestaurantCard restaurant={item} userLocation={userLocation} />}
+            renderItem={({ item }) => (
+                <RestaurantCard
+                    restaurant={item}
+                    userLocation={userLocation}
+                    travelMode={travelMode}
+                />
+            )}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
         />

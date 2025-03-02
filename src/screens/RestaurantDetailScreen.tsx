@@ -2,14 +2,14 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
-import { Restaurant, Location } from '../types';
+import { Restaurant, Location, TravelMode } from '../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 
 type RestaurantDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
 
 export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ route, navigation }) => {
-    const { restaurant, userLocation } = route.params;
+    const { restaurant, userLocation, travelMode = 'driving' } = route.params;
 
     const renderRatingStars = (rating?: number) => {
         if (!rating) return null;
@@ -52,15 +52,30 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
 
     const getDirections = () => {
         const destination = `${restaurant.latitude},${restaurant.longitude}`;
+
         const url = Platform.select({
-            ios: `maps://app?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}`,
-            android: `google.navigation:q=${destination}`
+            ios: `maps://app?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=${getAppleMapsDirectionFlag(travelMode)}`,
+            android: `google.navigation:q=${destination}&mode=${travelMode}`
         });
 
         if (url) {
             Linking.openURL(url).catch(err =>
                 console.error('An error occurred while opening maps', err)
             );
+        }
+    };
+
+    const getAppleMapsDirectionFlag = (mode: TravelMode): string => {
+        switch (mode) {
+            case 'walking':
+                return 'w';
+            case 'transit':
+                return 'r';
+            case 'bicycling':
+                return 'b';
+            case 'driving':
+            default:
+                return 'd';
         }
     };
 
