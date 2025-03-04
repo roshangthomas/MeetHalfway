@@ -51,26 +51,47 @@ export const searchRestaurants = async (
     category: PlaceCategory
 ): Promise<Restaurant[]> => {
     try {
+        console.log(`Searching for ${category} near ${location.latitude},${location.longitude}`);
+
         const response = await axios.get<GooglePlacesResponse>(
             `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${location.latitude
-            },${location.longitude}&radius=1000&type=${category}&key=${GOOGLE_MAPS_API_KEY}`
+            },${location.longitude}&radius=1500&type=${category}&key=${GOOGLE_MAPS_API_KEY}`
         );
+
+        if (response.data.results.length === 0) {
+            console.log(`No ${category} found near the specified location`);
+            return [];
+        }
 
         return response.data.results.map((place) => ({
             id: place.place_id,
             name: place.name,
-            rating: place.rating,
-            address: place.vicinity,
+            rating: place.rating || 0,
+            address: place.vicinity || 'Address not available',
             latitude: place.geometry.location.lat,
             longitude: place.geometry.location.lng,
             photoUrl: place.photos?.[0]
                 ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_MAPS_API_KEY}`
                 : undefined,
-            totalRatings: place.user_ratings_total,
-            priceLevel: place.price_level,
-            types: place.types,
+            totalRatings: place.user_ratings_total || 0,
+            priceLevel: place.price_level || 0,
+            types: place.types || [],
         }));
-    } catch (error) {
+    } catch (error: any) {
+        console.error('Error searching for places:', error);
+
+        // Check if it's an Axios error with a response
+        if (error && error.response && error.response.data) {
+            console.error('API response error:', error.response.data);
+
+            // Check for specific API errors
+            const status = error.response.data.status;
+            if (status === 'OVER_QUERY_LIMIT') {
+                throw new Error('Google Places API query limit exceeded. Please try again later.');
+            } else if (status === 'REQUEST_DENIED') {
+                throw new Error('API request denied. Please check your API key configuration.');
+            }
+        }
         throw new Error('Failed to search places');
     }
 };
@@ -86,13 +107,24 @@ export const getTravelInfo = async (
             }&destination=${destination.latitude},${destination.longitude}&mode=${mode}&key=${GOOGLE_MAPS_API_KEY}`
         );
 
+        if (!response.data.routes || response.data.routes.length === 0) {
+            return {
+                distance: 'Unknown',
+                duration: 'Unknown'
+            };
+        }
+
         const route = response.data.routes[0].legs[0];
         return {
             distance: route.distance.text,
             duration: route.duration.text,
         };
     } catch (error) {
-        throw new Error('Failed to get travel information');
+        console.error('Error getting travel info:', error);
+        return {
+            distance: 'Unknown',
+            duration: 'Unknown'
+        };
     }
 };
 

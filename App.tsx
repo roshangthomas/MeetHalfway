@@ -7,13 +7,13 @@ import { Marker } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { getCurrentLocation, geocodeAddress, calculateMidpoint } from './src/services/location';
+import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint } from './src/services/location';
+import { searchRestaurants, getTravelInfo } from './src/services/places';
 import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
 import { ERROR_MESSAGES } from './src/constants';
 import { CategoryPicker } from './src/components/CategoryPicker';
 import { LoadingOverlay } from './src/components/LoadingOverlay';
-import { mockPlaces } from './src/data/mockPlaces';
 import { ResultsScreen } from './src/screens/ResultsScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -52,15 +52,39 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       return;
     }
 
+    if (!partnerAddress.trim()) {
+      setError(ERROR_MESSAGES.PARTNER_LOCATION_INVALID);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Geocode partner address
+      let partnerLoc;
+      try {
+        partnerLoc = await geocodeAddress(partnerAddress);
+      } catch (geocodeError) {
+        if (geocodeError instanceof Error) {
+          setError(geocodeError.message);
+        } else {
+          setError(ERROR_MESSAGES.GEOCODING_FAILED);
+        }
+        setLoading(false);
+        return;
+      }
 
-      const partnerLoc = await geocodeAddress(partnerAddress);
-      const midpoint = calculateMidpoint(userLocation, partnerLoc);
+      // Calculate midpoint based on road distance
+      let midpoint;
+      try {
+        // Use road-based midpoint calculation
+        midpoint = await calculateRoadMidpoint(userLocation, partnerLoc);
+      } catch (midpointError) {
+        console.warn('Road midpoint calculation failed, falling back to simple midpoint', midpointError);
+        // Fallback to simple midpoint if road calculation fails
+        midpoint = calculateMidpoint(userLocation, partnerLoc);
+      }
 
       // Update map region to show the midpoint
       setMapRegion({
@@ -70,9 +94,68 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         longitudeDelta: 0.0421,
       });
 
+      // Fetch restaurants near the midpoint for each selected category
+      let allRestaurants: Restaurant[] = [];
+
+      try {
+        for (const category of selectedCategories) {
+          const categoryRestaurants = await searchRestaurants(midpoint, category);
+          allRestaurants = [...allRestaurants, ...categoryRestaurants];
+        }
+      } catch (searchError) {
+        if (searchError instanceof Error) {
+          setError(searchError.message);
+        } else {
+          setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // If no restaurants found
+      if (allRestaurants.length === 0) {
+        setError(`No places found near the midpoint. Try different categories or locations.`);
+        setLoading(false);
+        return;
+      }
+
+      // Remove duplicates (in case a place appears in multiple categories)
+      allRestaurants = allRestaurants.filter((restaurant, index, self) =>
+        index === self.findIndex((r) => r.id === restaurant.id)
+      );
+
+      // Sort by rating (highest first)
+      allRestaurants.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+      // Limit to top 20 results
+      allRestaurants = allRestaurants.slice(0, 20);
+
+      // Add travel information for each restaurant
+      const travelPromises = allRestaurants.map(async (restaurant) => {
+        try {
+          const restaurantLocation = {
+            latitude: restaurant.latitude,
+            longitude: restaurant.longitude
+          };
+
+          const travelInfo = await getTravelInfo(userLocation, restaurantLocation, travelMode);
+          restaurant.distance = travelInfo.distance;
+          restaurant.duration = travelInfo.duration;
+          return restaurant;
+        } catch (error) {
+          console.error('Failed to get travel info for restaurant:', restaurant.name);
+          restaurant.distance = 'Unknown';
+          restaurant.duration = 'Unknown';
+          return restaurant;
+        }
+      });
+
+      // Wait for all travel info requests to complete
+      allRestaurants = await Promise.all(travelPromises);
+
       // Navigate to results screen with all necessary data
       navigation.navigate('Results', {
-        restaurants: mockPlaces,
+        restaurants: allRestaurants,
         userLocation,
         partnerLocation: partnerLoc,
         midpointLocation: midpoint,
@@ -80,7 +163,15 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       });
 
     } catch (error) {
-      setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
+      console.error('Search error:', error);
+
+      if (error instanceof Error) {
+        // Use the specific error message if available
+        setError(error.message);
+      } else {
+        // Default error message
+        setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
+      }
     } finally {
       setLoading(false);
     }
