@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { Restaurant, Location, TravelMode } from '../types';
@@ -79,6 +79,24 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         }
     };
 
+    const shareLocation = async () => {
+        try {
+            const restaurantLocation = `${restaurant.latitude},${restaurant.longitude}`;
+            const mapsUrl = Platform.select({
+                ios: `https://maps.apple.com/?q=${restaurant.name}&ll=${restaurantLocation}`,
+                android: `https://www.google.com/maps/search/?api=1&query=${restaurantLocation}&query_place_id=${restaurant.id}`
+            });
+
+            await Share.share({
+                message: `Check out ${restaurant.name} at ${restaurant.address || 'this location'}. ${mapsUrl}`,
+                url: mapsUrl, // iOS only
+                title: `${restaurant.name} Location` // Android only
+            });
+        } catch (error) {
+            console.error('Error sharing location:', error);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView style={styles.scrollView}>
@@ -135,11 +153,19 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                     </View>
 
                     <TouchableOpacity
+                        style={styles.shareButton}
+                        onPress={shareLocation}
+                    >
+                        <FontAwesome name="share-alt" size={18} color={COLORS.SURFACE} />
+                        <Text style={styles.buttonText}>Share Location</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
                         style={styles.directionsButton}
                         onPress={getDirections}
                     >
                         <FontAwesome name="map" size={18} color={COLORS.SURFACE} />
-                        <Text style={styles.directionsButtonText}>Get Directions</Text>
+                        <Text style={styles.buttonText}>Get Directions</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
@@ -245,7 +271,17 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         gap: 10,
     },
-    directionsButtonText: {
+    shareButton: {
+        backgroundColor: COLORS.SECONDARY,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 12,
+        gap: 10,
+        marginBottom: 12,
+    },
+    buttonText: {
         color: COLORS.SURFACE,
         fontSize: 16,
         fontWeight: '600',

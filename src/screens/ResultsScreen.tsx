@@ -9,11 +9,11 @@ import { RootStackParamList } from '../types';
 
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
-type SortOption = 'rating' | 'distance' | 'duration';
+type SortOption = 'rating' | 'distance' | 'duration' | 'fairness' | 'optimal';
 
 export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation }) => {
     const { restaurants, userLocation, partnerLocation, midpointLocation, travelMode } = route.params;
-    const [sortBy, setSortBy] = useState<SortOption>('rating');
+    const [sortBy, setSortBy] = useState<SortOption>('optimal');
     const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(restaurants);
 
     // Sort restaurants based on selected option
@@ -33,6 +33,16 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 const durA = parseFloat(a.duration?.replace(/[^0-9.]/g, '') || '999');
                 const durB = parseFloat(b.duration?.replace(/[^0-9.]/g, '') || '999');
                 return durA - durB;
+            } else if (option === 'fairness') {
+                // Sort by time difference (lower is better)
+                const diffA = a.timeDifference || 999;
+                const diffB = b.timeDifference || 999;
+                return diffA - diffB;
+            } else if (option === 'optimal') {
+                // Sort by the calculated optimal score (higher is better)
+                const scoreA = a.score || 0;
+                const scoreB = b.score || 0;
+                return scoreB - scoreA;
             }
             return 0;
         });
@@ -55,20 +65,29 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                         <Text style={styles.sortLabel}>Sort by:</Text>
                         <View style={styles.sortButtons}>
                             <TouchableOpacity
+                                style={[styles.sortButton, sortBy === 'optimal' && styles.sortButtonActive]}
+                                onPress={() => sortRestaurants('optimal')}
+                            >
+                                <Text style={[styles.sortButtonText, sortBy === 'optimal' && styles.sortButtonTextActive]}>
+                                    Best Match
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.sortButton, sortBy === 'fairness' && styles.sortButtonActive]}
+                                onPress={() => sortRestaurants('fairness')}
+                            >
+                                <Text style={[styles.sortButtonText, sortBy === 'fairness' && styles.sortButtonTextActive]}>
+                                    Most Fair
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
                                 style={[styles.sortButton, sortBy === 'rating' && styles.sortButtonActive]}
                                 onPress={() => sortRestaurants('rating')}
                             >
                                 <Text style={[styles.sortButtonText, sortBy === 'rating' && styles.sortButtonTextActive]}>
                                     Rating
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[styles.sortButton, sortBy === 'distance' && styles.sortButtonActive]}
-                                onPress={() => sortRestaurants('distance')}
-                            >
-                                <Text style={[styles.sortButtonText, sortBy === 'distance' && styles.sortButtonTextActive]}>
-                                    Distance
                                 </Text>
                             </TouchableOpacity>
 
@@ -93,6 +112,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                         <RestaurantList
                             restaurants={filteredRestaurants}
                             userLocation={userLocation}
+                            partnerLocation={partnerLocation}
                             travelMode={travelMode}
                         />
                     )}

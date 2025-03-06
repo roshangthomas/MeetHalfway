@@ -7,7 +7,7 @@ import { Marker } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint } from './src/services/location';
+import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces } from './src/services/location';
 import { searchRestaurants, getTravelInfo } from './src/services/places';
 import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
@@ -94,68 +94,90 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         longitudeDelta: 0.0421,
       });
 
-      // Fetch restaurants near the midpoint for each selected category
-      let allRestaurants: Restaurant[] = [];
-
+      // Find optimal meeting places
+      let optimizedRestaurants;
       try {
-        for (const category of selectedCategories) {
-          const categoryRestaurants = await searchRestaurants(midpoint, category);
-          allRestaurants = [...allRestaurants, ...categoryRestaurants];
-        }
+        optimizedRestaurants = await findOptimalMeetingPlaces(
+          userLocation,
+          partnerLoc,
+          travelMode,
+          selectedCategories,
+          20 // Maximum number of results
+        );
       } catch (searchError) {
-        if (searchError instanceof Error) {
-          setError(searchError.message);
-        } else {
-          setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
-        }
-        setLoading(false);
-        return;
-      }
+        // If optimized search fails, fall back to the original approach
+        console.warn('Optimized venue search failed, falling back to simple search', searchError);
 
-      // If no restaurants found
-      if (allRestaurants.length === 0) {
-        setError(`No places found near the midpoint. Try different categories or locations.`);
-        setLoading(false);
-        return;
-      }
+        // Fetch restaurants near the midpoint for each selected category
+        let allRestaurants: Restaurant[] = [];
 
-      // Remove duplicates (in case a place appears in multiple categories)
-      allRestaurants = allRestaurants.filter((restaurant, index, self) =>
-        index === self.findIndex((r) => r.id === restaurant.id)
-      );
-
-      // Sort by rating (highest first)
-      allRestaurants.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-
-      // Limit to top 20 results
-      allRestaurants = allRestaurants.slice(0, 20);
-
-      // Add travel information for each restaurant
-      const travelPromises = allRestaurants.map(async (restaurant) => {
         try {
-          const restaurantLocation = {
-            latitude: restaurant.latitude,
-            longitude: restaurant.longitude
-          };
-
-          const travelInfo = await getTravelInfo(userLocation, restaurantLocation, travelMode);
-          restaurant.distance = travelInfo.distance;
-          restaurant.duration = travelInfo.duration;
-          return restaurant;
+          for (const category of selectedCategories) {
+            const categoryRestaurants = await searchRestaurants(midpoint, category);
+            allRestaurants = [...allRestaurants, ...categoryRestaurants];
+          }
         } catch (error) {
-          console.error('Failed to get travel info for restaurant:', restaurant.name);
-          restaurant.distance = 'Unknown';
-          restaurant.duration = 'Unknown';
-          return restaurant;
+          if (error instanceof Error) {
+            setError(error.message);
+          } else {
+            setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
+          }
+          setLoading(false);
+          return;
         }
-      });
 
-      // Wait for all travel info requests to complete
-      allRestaurants = await Promise.all(travelPromises);
+        // If no restaurants found
+        if (allRestaurants.length === 0) {
+          setError(`No places found near the midpoint. Try different categories or locations.`);
+          setLoading(false);
+          return;
+        }
+
+        // Remove duplicates (in case a place appears in multiple categories)
+        allRestaurants = allRestaurants.filter((restaurant, index, self) =>
+          index === self.findIndex((r) => r.id === restaurant.id)
+        );
+
+        // Sort by rating (highest first)
+        allRestaurants.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+
+        // Limit to top 20 results
+        allRestaurants = allRestaurants.slice(0, 20);
+
+        // Add travel information for each restaurant
+        const travelPromises = allRestaurants.map(async (restaurant) => {
+          try {
+            const restaurantLocation = {
+              latitude: restaurant.latitude,
+              longitude: restaurant.longitude
+            };
+
+            const travelInfo = await getTravelInfo(userLocation, restaurantLocation, travelMode);
+            restaurant.distance = travelInfo.distance;
+            restaurant.duration = travelInfo.duration;
+            return restaurant;
+          } catch (error) {
+            console.error('Failed to get travel info for restaurant:', restaurant.name);
+            restaurant.distance = 'Unknown';
+            restaurant.duration = 'Unknown';
+            return restaurant;
+          }
+        });
+
+        // Wait for all travel info requests to complete
+        optimizedRestaurants = await Promise.all(travelPromises);
+      }
+
+      // If no restaurants found after all attempts
+      if (!optimizedRestaurants || optimizedRestaurants.length === 0) {
+        setError(`No places found. Try different categories or locations.`);
+        setLoading(false);
+        return;
+      }
 
       // Navigate to results screen with all necessary data
       navigation.navigate('Results', {
-        restaurants: allRestaurants,
+        restaurants: optimizedRestaurants,
         userLocation,
         partnerLocation: partnerLoc,
         midpointLocation: midpoint,
