@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, ScrollView, SafeAreaView, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { RestaurantList } from '../components/RestaurantList';
-import { Map } from '../components/Map';
 import { Restaurant, Location, TravelMode } from '../types';
 import { styles } from '../styles/Results.styles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { COLORS } from '../constants/colors';
 
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
@@ -52,56 +52,53 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView}>
-                <View style={styles.content}>
-                    <Map
-                        userLocation={userLocation}
-                        partnerLocation={partnerLocation}
-                        midpoint={midpointLocation}
-                        restaurants={filteredRestaurants}
-                    />
+            <ScrollView style={styles.content}>
+                <View style={styles.sortContainer}>
+                    <Text style={styles.sortLabel}>Sort by:</Text>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.sortButtons}
+                    >
+                        <TouchableOpacity
+                            style={[styles.sortButton, sortBy === 'optimal' && styles.sortButtonActive]}
+                            onPress={() => sortRestaurants('optimal')}
+                        >
+                            <Text style={[styles.sortButtonText, sortBy === 'optimal' && styles.sortButtonTextActive]}>
+                                Best Match
+                            </Text>
+                        </TouchableOpacity>
 
-                    <View style={styles.sortContainer}>
-                        <Text style={styles.sortLabel}>Sort by:</Text>
-                        <View style={styles.sortButtons}>
-                            <TouchableOpacity
-                                style={[styles.sortButton, sortBy === 'optimal' && styles.sortButtonActive]}
-                                onPress={() => sortRestaurants('optimal')}
-                            >
-                                <Text style={[styles.sortButtonText, sortBy === 'optimal' && styles.sortButtonTextActive]}>
-                                    Best Match
-                                </Text>
-                            </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.sortButton, sortBy === 'fairness' && styles.sortButtonActive]}
+                            onPress={() => sortRestaurants('fairness')}
+                        >
+                            <Text style={[styles.sortButtonText, sortBy === 'fairness' && styles.sortButtonTextActive]}>
+                                Most Fair
+                            </Text>
+                        </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={[styles.sortButton, sortBy === 'fairness' && styles.sortButtonActive]}
-                                onPress={() => sortRestaurants('fairness')}
-                            >
-                                <Text style={[styles.sortButtonText, sortBy === 'fairness' && styles.sortButtonTextActive]}>
-                                    Most Fair
-                                </Text>
-                            </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.sortButton, sortBy === 'rating' && styles.sortButtonActive]}
+                            onPress={() => sortRestaurants('rating')}
+                        >
+                            <Text style={[styles.sortButtonText, sortBy === 'rating' && styles.sortButtonTextActive]}>
+                                Rating
+                            </Text>
+                        </TouchableOpacity>
 
-                            <TouchableOpacity
-                                style={[styles.sortButton, sortBy === 'rating' && styles.sortButtonActive]}
-                                onPress={() => sortRestaurants('rating')}
-                            >
-                                <Text style={[styles.sortButtonText, sortBy === 'rating' && styles.sortButtonTextActive]}>
-                                    Rating
-                                </Text>
-                            </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.sortButton, sortBy === 'duration' && styles.sortButtonActive]}
+                            onPress={() => sortRestaurants('duration')}
+                        >
+                            <Text style={[styles.sortButtonText, sortBy === 'duration' && styles.sortButtonTextActive]}>
+                                Travel Time
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
+                </View>
 
-                            <TouchableOpacity
-                                style={[styles.sortButton, sortBy === 'duration' && styles.sortButtonActive]}
-                                onPress={() => sortRestaurants('duration')}
-                            >
-                                <Text style={[styles.sortButtonText, sortBy === 'duration' && styles.sortButtonTextActive]}>
-                                    Travel Time
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
+                <View style={styles.listContainer}>
                     {filteredRestaurants.length === 0 ? (
                         <View style={styles.noResultsContainer}>
                             <Text style={styles.noResultsText}>
