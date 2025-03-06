@@ -16,6 +16,16 @@ export interface Restaurant {
     totalRatings?: number;
     priceLevel?: number;
     types?: string[];
+    travelTimeA?: number;
+    travelTimeB?: number;
+    timeDifference?: number;
+    totalTravelTime?: number;
+    fairnessScore?: number;
+    score?: number;
+    distanceA?: string;
+    durationA?: string;
+    distanceB?: string;
+    durationB?: string;
 }
 
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'bicycling';

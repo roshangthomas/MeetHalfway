@@ -8,17 +8,33 @@ A React Native app that helps two people find restaurants at a convenient midpoi
 - Lets you input a second location
 - Finds the midpoint between both locations based on actual road distance
 - Searches for restaurants near the midpoint
-- Shows travel time and distance to each restaurant
+- Optimizes venue selection based on travel times for both parties
+- Ranks venues by fairness, rating, and overall experience
+- Shows travel time and distance to each restaurant for both people
 - Displays everything on an interactive map
 
 ## How It Works
 
-The app calculates the meeting point using actual road distance:
-1. Gets directions between the two locations using Google Directions API
-2. Calculates the total route distance
-3. Finds the point that's exactly halfway along the route
-4. Searches for restaurants near this midpoint
-5. Calculates travel times for both parties to each restaurant
+The app uses a sophisticated algorithm to find the best meeting places:
+
+1. **Road-Based Midpoint Calculation**:
+   - Gets directions between the two locations using Google Directions API
+   - Calculates the total route distance
+   - Finds the point that's exactly halfway along the route
+
+2. **Venue Optimization**:
+   - Searches for restaurants and other venues near the midpoint
+   - Calculates travel times from both starting points to each venue
+   - Ranks venues using a weighted scoring system that considers:
+     - Fairness (minimal difference in travel times)
+     - Venue quality (ratings)
+     - Total travel time
+
+3. **Smart Sorting Options**:
+   - Best Match: Balanced score of fairness, rating, and travel time
+   - Most Fair: Venues with the smallest difference in travel times
+   - Highest Rated: Venues with the best reviews
+   - Travel Time: Venues with the shortest travel time
 
 ## Prerequisites
 
