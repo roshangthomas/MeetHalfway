@@ -46,6 +46,12 @@
         }
       ],
       "expo-location"
-    ]
+    ],
+    "packagerOpts": {
+      "assetExts": [
+        "ttf",
+        "otf"
+      ]
+    }
   }
 }

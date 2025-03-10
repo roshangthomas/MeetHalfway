@@ -1,120 +1,219 @@
-import React, { useState } from 'react';
-import { View, ScrollView, SafeAreaView, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, ScrollView, SafeAreaView, Text, TouchableOpacity, ActivityIndicator, FlatList, Image } from 'react-native';
 import { RestaurantList } from '../components/RestaurantList';
-import { Restaurant, Location, TravelMode } from '../types';
+import { Restaurant, Location, TravelMode, SortOption, RootStackParamList } from '../types';
 import { styles } from '../styles/Results.styles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
 import { COLORS } from '../constants/colors';
+import { Ionicons } from '@expo/vector-icons';
+import { FilterModal, FilterOptions } from '../components/FilterModal';
+import { FontAwesome } from '@expo/vector-icons';
+import { SortModal } from '../components/SortModal';
+import * as Font from 'expo-font';
 
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
-type SortOption = 'rating' | 'distance' | 'duration' | 'fairness' | 'optimal';
-
 export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation }) => {
     const { restaurants, userLocation, partnerLocation, midpointLocation, travelMode } = route.params;
-    const [sortBy, setSortBy] = useState<SortOption>('optimal');
-    const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>(restaurants);
+    const [sortOption, setSortOption] = useState<SortOption>('distance');
+    const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+    const [isSortModalVisible, setIsSortModalVisible] = useState(false);
+    const [fontsLoaded, setFontsLoaded] = useState(false);
+    const [filters, setFilters] = useState<FilterOptions>({
+        minRating: 0,
+        minReviews: 0,
+        maxPrice: 4,
+        cuisineTypes: []
+    });
 
-    // Sort restaurants based on selected option
-    const sortRestaurants = (option: SortOption) => {
-        setSortBy(option);
+    // Load fonts
+    useEffect(() => {
+        async function loadFonts() {
+            await Font.loadAsync({
+                ...FontAwesome.font,
+                ...Ionicons.font
+            });
+            setFontsLoaded(true);
+        }
+        loadFonts();
+    }, []);
 
-        const sorted = [...restaurants].sort((a, b) => {
-            if (option === 'rating') {
-                return (b.rating || 0) - (a.rating || 0);
-            } else if (option === 'distance') {
-                // Convert distance strings like "2.5 mi" to numbers for sorting
-                const distA = parseFloat(a.distance?.replace(/[^0-9.]/g, '') || '999');
-                const distB = parseFloat(b.distance?.replace(/[^0-9.]/g, '') || '999');
-                return distA - distB;
-            } else if (option === 'duration') {
-                // Convert duration strings like "15 mins" to numbers for sorting
-                const durA = parseFloat(a.duration?.replace(/[^0-9.]/g, '') || '999');
-                const durB = parseFloat(b.duration?.replace(/[^0-9.]/g, '') || '999');
-                return durA - durB;
-            } else if (option === 'fairness') {
-                // Sort by time difference (lower is better)
-                const diffA = a.timeDifference || 999;
-                const diffB = b.timeDifference || 999;
-                return diffA - diffB;
-            } else if (option === 'optimal') {
-                // Sort by the calculated optimal score (higher is better)
-                const scoreA = a.score || 0;
-                const scoreB = b.score || 0;
-                return scoreB - scoreA;
+    // Extract all unique cuisine types from restaurants
+    const availableCuisineTypes = useMemo(() => {
+        const cuisineSet = new Set<string>();
+        restaurants.forEach(restaurant => {
+            if (restaurant.types) {
+                restaurant.types.forEach(type => cuisineSet.add(type));
             }
-            return 0;
+        });
+        return Array.from(cuisineSet);
+    }, [restaurants]);
+
+    const sortedAndFilteredRestaurants = useMemo(() => {
+        // First apply filters
+        let filteredResults = restaurants.filter(restaurant => {
+            // Filter by minimum rating
+            if (filters.minRating > 0 && (!restaurant.rating || restaurant.rating < filters.minRating)) {
+                return false;
+            }
+
+            // Filter by minimum reviews
+            if (filters.minReviews > 0 && (!restaurant.totalRatings || restaurant.totalRatings < filters.minReviews)) {
+                return false;
+            }
+
+            // Filter by price level
+            if (restaurant.priceLevel && restaurant.priceLevel > filters.maxPrice) {
+                return false;
+            }
+
+            // Filter by cuisine types
+            if (filters.cuisineTypes.length > 0 &&
+                (!restaurant.types || !restaurant.types.some(type => filters.cuisineTypes.includes(type)))) {
+                return false;
+            }
+
+            return true;
         });
 
-        setFilteredRestaurants(sorted);
+        // Then sort the filtered results
+        return [...filteredResults].sort((a, b) => {
+            switch (sortOption) {
+                case 'rating':
+                    return (b.rating || 0) - (a.rating || 0);
+                case 'price':
+                    return (a.priceLevel || 0) - (b.priceLevel || 0);
+                case 'travelTimeDiff':
+                    // Calculate travel time difference for sorting
+                    const aUserTime = a.durationA ? convertDurationToMinutes(a.durationA) : 0;
+                    const aFriendTime = a.durationB ? convertDurationToMinutes(a.durationB) : 0;
+                    const aDiff = Math.abs(aUserTime - aFriendTime);
+
+                    const bUserTime = b.durationA ? convertDurationToMinutes(b.durationA) : 0;
+                    const bFriendTime = b.durationB ? convertDurationToMinutes(b.durationB) : 0;
+                    const bDiff = Math.abs(bUserTime - bFriendTime);
+
+                    return aDiff - bDiff;
+                case 'distance':
+                default:
+                    // Default sort by distance
+                    const aDistance = a.distance ? parseFloat(a.distance.replace(/[^0-9.]/g, '')) : 0;
+                    const bDistance = b.distance ? parseFloat(b.distance.replace(/[^0-9.]/g, '')) : 0;
+                    return aDistance - bDistance;
+            }
+        });
+    }, [restaurants, sortOption, filters]);
+
+    // Helper function to convert duration strings like "15 mins" to minutes
+    const convertDurationToMinutes = (duration: string): number => {
+        const match = duration.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+    };
+
+    const handleApplyFilters = (newFilters: FilterOptions) => {
+        setFilters(newFilters);
+        setIsFilterModalVisible(false);
+    };
+
+    const handleApplySort = (newSortOption: SortOption) => {
+        setSortOption(newSortOption);
+        setIsSortModalVisible(false);
+    };
+
+    // Get the active filter count
+    const getActiveFilterCount = (): number => {
+        let count = 0;
+        if (filters.minRating > 0) count++;
+        if (filters.minReviews > 0) count++;
+        if (filters.maxPrice < 4) count++;
+        if (filters.cuisineTypes.length > 0) count++;
+        return count;
+    };
+
+    // Get sort option display name
+    const getSortOptionDisplayName = (): string => {
+        switch (sortOption) {
+            case 'distance':
+                return 'Distance';
+            case 'rating':
+                return 'Rating';
+            case 'price':
+                return 'Price';
+            case 'travelTimeDiff':
+                return 'Travel Time';
+            default:
+                return 'Distance';
+        }
     };
 
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView style={styles.content}>
-                <View style={styles.sortContainer}>
-                    <Text style={styles.sortLabel}>Sort by:</Text>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.sortButtons}
-                    >
+                {/* Filter and Sort Bar */}
+                <View style={styles.filterSortBar}>
+                    <View style={styles.divider} />
+
+                    <View style={styles.filterSortButtonsContainer}>
                         <TouchableOpacity
-                            style={[styles.sortButton, sortBy === 'optimal' && styles.sortButtonActive]}
-                            onPress={() => sortRestaurants('optimal')}
+                            style={styles.filterSortButton}
+                            onPress={() => setIsFilterModalVisible(true)}
                         >
-                            <Text style={[styles.sortButtonText, sortBy === 'optimal' && styles.sortButtonTextActive]}>
-                                Best Match
+                            <Text style={styles.filterSortButtonText}>
+                                Filters{getActiveFilterCount() > 0 ? ` (${getActiveFilterCount()})` : ''}
                             </Text>
+                            <Text style={styles.filterIcon}>≡</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[styles.sortButton, sortBy === 'fairness' && styles.sortButtonActive]}
-                            onPress={() => sortRestaurants('fairness')}
-                        >
-                            <Text style={[styles.sortButtonText, sortBy === 'fairness' && styles.sortButtonTextActive]}>
-                                Most Fair
-                            </Text>
-                        </TouchableOpacity>
+                        <View style={styles.verticalDivider} />
 
                         <TouchableOpacity
-                            style={[styles.sortButton, sortBy === 'rating' && styles.sortButtonActive]}
-                            onPress={() => sortRestaurants('rating')}
+                            style={styles.filterSortButton}
+                            onPress={() => setIsSortModalVisible(true)}
                         >
-                            <Text style={[styles.sortButtonText, sortBy === 'rating' && styles.sortButtonTextActive]}>
-                                Rating
+                            <Text style={styles.filterSortButtonText}>
+                                Sort: {getSortOptionDisplayName()}
                             </Text>
+                            <View style={styles.sortIconBox}>
+                                <Text style={styles.sortIconText}>↕</Text>
+                            </View>
                         </TouchableOpacity>
+                    </View>
 
-                        <TouchableOpacity
-                            style={[styles.sortButton, sortBy === 'duration' && styles.sortButtonActive]}
-                            onPress={() => sortRestaurants('duration')}
-                        >
-                            <Text style={[styles.sortButtonText, sortBy === 'duration' && styles.sortButtonTextActive]}>
-                                Travel Time
-                            </Text>
-                        </TouchableOpacity>
-                    </ScrollView>
+                    <View style={styles.divider} />
                 </View>
 
                 <View style={styles.listContainer}>
-                    {filteredRestaurants.length === 0 ? (
-                        <View style={styles.noResultsContainer}>
-                            <Text style={styles.noResultsText}>
-                                No places found in this area. Try adjusting your search criteria.
-                            </Text>
-                        </View>
-                    ) : (
+                    {sortedAndFilteredRestaurants.length > 0 ? (
                         <RestaurantList
-                            restaurants={filteredRestaurants}
+                            restaurants={sortedAndFilteredRestaurants}
                             userLocation={userLocation}
                             partnerLocation={partnerLocation}
                             travelMode={travelMode}
                         />
+                    ) : (
+                        <View style={styles.noResultsContainer}>
+                            <Text style={styles.noResultsText}>
+                                No restaurants match your current filters. Try adjusting your filters to see more results.
+                            </Text>
+                        </View>
                     )}
                 </View>
             </ScrollView>
+
+            <FilterModal
+                visible={isFilterModalVisible}
+                onClose={() => setIsFilterModalVisible(false)}
+                onApply={handleApplyFilters}
+                initialFilters={filters}
+                availableCuisineTypes={availableCuisineTypes}
+            />
+
+            <SortModal
+                visible={isSortModalVisible}
+                onClose={() => setIsSortModalVisible(false)}
+                onApply={handleApplySort}
+                currentSortOption={sortOption}
+            />
         </SafeAreaView>
     );
 }; 

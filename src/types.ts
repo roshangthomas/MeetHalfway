@@ -45,6 +45,8 @@ export const PLACE_CATEGORY_LABELS: Record<PlaceCategory, string> = {
 export const MIN_CATEGORIES = 1;
 export const MAX_CATEGORIES = Object.keys(PLACE_CATEGORY_LABELS).length;
 
+export type SortOption = 'distance' | 'rating' | 'price' | 'travelTimeDiff';
+
 export type RootStackParamList = {
     Home: undefined;
     Results: {
