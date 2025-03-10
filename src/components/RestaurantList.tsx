@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Restaurant, Location, TravelMode } from '../types';
 import { COLORS } from '../constants/colors';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { RatingDisplay } from './RatingDisplay';
@@ -19,19 +19,19 @@ import { RatingDisplay } from './RatingDisplay';
 interface RestaurantListProps {
     restaurants: Restaurant[];
     userLocation: Location;
-    partnerLocation?: Location;
-    travelMode?: TravelMode;
+    partnerLocations: Location[];
+    travelMode: TravelMode;
 }
 
 const RestaurantCard: React.FC<{
     restaurant: Restaurant,
     userLocation: Location,
-    partnerLocation?: Location,
-    travelMode?: TravelMode
+    partnerLocations: Location[],
+    travelMode: TravelMode
 }> = ({
     restaurant,
     userLocation,
-    partnerLocation,
+    partnerLocations,
     travelMode
 }) => {
         const navigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -142,23 +142,26 @@ const RestaurantCard: React.FC<{
                         </View>
 
                         {/* Partner travel info - only show if we have partner location */}
-                        {partnerLocation && (
-                            <View style={styles.travelInfoColumn}>
-                                <Text style={styles.travelInfoLabel}>Partner Travel:</Text>
-                                {restaurant.durationB && (
-                                    <Text style={styles.travelDetail}>
-                                        <FontAwesome name="clock-o" size={14} color={COLORS.SECONDARY} />
-                                        {' ' + restaurant.durationB}
-                                    </Text>
-                                )}
-                                {restaurant.distanceB && (
-                                    <Text style={styles.travelDetail}>
-                                        <FontAwesome name="map-marker" size={14} color={COLORS.SECONDARY} />
-                                        {' ' + restaurant.distanceB}
-                                    </Text>
-                                )}
-                            </View>
-                        )}
+                        {partnerLocations.map((_, index) => {
+                            const partnerInfo = restaurant.travelInfos?.find(info => info.locationIndex === index + 1);
+                            return (
+                                <View key={`partner-${index}`} style={styles.travelInfoColumn}>
+                                    <Text style={styles.travelInfoLabel}>Partner {index + 2} Travel:</Text>
+                                    {partnerInfo?.duration && (
+                                        <Text style={styles.travelDetail}>
+                                            <FontAwesome name="clock-o" size={14} color={COLORS.SECONDARY} />
+                                            {' ' + partnerInfo.duration}
+                                        </Text>
+                                    )}
+                                    {partnerInfo?.distance && (
+                                        <Text style={styles.travelDetail}>
+                                            <FontAwesome name="map-marker" size={14} color={COLORS.SECONDARY} />
+                                            {' ' + partnerInfo.distance}
+                                        </Text>
+                                    )}
+                                </View>
+                            );
+                        })}
                     </View>
                 </View>
             </TouchableOpacity>
@@ -168,7 +171,7 @@ const RestaurantCard: React.FC<{
 export const RestaurantList: React.FC<RestaurantListProps> = ({
     restaurants,
     userLocation,
-    partnerLocation,
+    partnerLocations,
     travelMode
 }) => {
     return (
@@ -179,7 +182,7 @@ export const RestaurantList: React.FC<RestaurantListProps> = ({
                 <RestaurantCard
                     restaurant={item}
                     userLocation={userLocation}
-                    partnerLocation={partnerLocation}
+                    partnerLocations={partnerLocations}
                     travelMode={travelMode}
                 />
             )}

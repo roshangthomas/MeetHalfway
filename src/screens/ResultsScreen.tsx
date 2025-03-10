@@ -14,7 +14,7 @@ import * as Font from 'expo-font';
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
 export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation }) => {
-    const { restaurants, userLocation, partnerLocation, midpointLocation, travelMode } = route.params;
+    const { restaurants, userLocation, partnerLocations, midpointLocation, travelMode } = route.params;
     const [sortOption, setSortOption] = useState<SortOption>('distance');
     const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
     const [isSortModalVisible, setIsSortModalVisible] = useState(false);
@@ -84,22 +84,12 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 case 'price':
                     return (a.priceLevel || 0) - (b.priceLevel || 0);
                 case 'travelTimeDiff':
-                    // Calculate travel time difference for sorting
-                    const aUserTime = a.durationA ? convertDurationToMinutes(a.durationA) : 0;
-                    const aFriendTime = a.durationB ? convertDurationToMinutes(a.durationB) : 0;
-                    const aDiff = Math.abs(aUserTime - aFriendTime);
-
-                    const bUserTime = b.durationA ? convertDurationToMinutes(b.durationA) : 0;
-                    const bFriendTime = b.durationB ? convertDurationToMinutes(b.durationB) : 0;
-                    const bDiff = Math.abs(bUserTime - bFriendTime);
-
-                    return aDiff - bDiff;
+                    // Sort by fairness (lowest time difference between participants)
+                    return (a.timeDifference || 0) - (b.timeDifference || 0);
                 case 'distance':
                 default:
-                    // Default sort by distance
-                    const aDistance = a.distance ? parseFloat(a.distance.replace(/[^0-9.]/g, '')) : 0;
-                    const bDistance = b.distance ? parseFloat(b.distance.replace(/[^0-9.]/g, '')) : 0;
-                    return aDistance - bDistance;
+                    // Default sort by average travel time for all participants
+                    return (a.avgTravelTime || 0) - (b.avgTravelTime || 0);
             }
         });
     }, [restaurants, sortOption, filters]);
@@ -187,7 +177,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                         <RestaurantList
                             restaurants={sortedAndFilteredRestaurants}
                             userLocation={userLocation}
-                            partnerLocation={partnerLocation}
+                            partnerLocations={partnerLocations}
                             travelMode={travelMode}
                         />
                     ) : (

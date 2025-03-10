@@ -7,7 +7,7 @@ import { Marker } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
-import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces } from './src/services/location';
+import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, calculateMultiPointMidpoint, findOptimalMeetingPlaces } from './src/services/location';
 import { searchRestaurants, getTravelInfo } from './src/services/places';
 import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
@@ -17,6 +17,7 @@ import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { ResultsScreen } from './src/screens/ResultsScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -24,7 +25,8 @@ const Stack = createStackNavigator<RootStackParamList>();
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 function HomeScreen({ navigation }: HomeScreenProps) {
-  const [partnerAddress, setPartnerAddress] = useState('');
+  // Replace single partnerAddress with an array of addresses
+  const [partnerAddresses, setPartnerAddresses] = useState<string[]>(['']);
   const [userLocation, setUserLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,13 +48,37 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     setUserLocation(location);
   }, []);
 
+  // Function to update a specific address
+  const updateAddress = (index: number, value: string) => {
+    const newAddresses = [...partnerAddresses];
+    newAddresses[index] = value;
+    setPartnerAddresses(newAddresses);
+  };
+
+  // Function to add a new address input (up to max 2 additional addresses)
+  const addAddressInput = () => {
+    if (partnerAddresses.length < 3) {
+      setPartnerAddresses([...partnerAddresses, '']);
+    }
+  };
+
+  // Function to remove an address input
+  const removeAddressInput = (index: number) => {
+    const newAddresses = [...partnerAddresses];
+    newAddresses.splice(index, 1);
+    setPartnerAddresses(newAddresses);
+  };
+
   const handleSearch = async () => {
     if (!userLocation) {
       setError(ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
       return;
     }
 
-    if (!partnerAddress.trim()) {
+    // Filter out empty addresses
+    const validAddresses = partnerAddresses.filter(addr => addr.trim() !== '');
+
+    if (validAddresses.length === 0) {
       setError(ERROR_MESSAGES.PARTNER_LOCATION_INVALID);
       return;
     }
@@ -61,29 +87,35 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     setError(null);
 
     try {
-      // Geocode partner address
-      let partnerLoc;
-      try {
-        partnerLoc = await geocodeAddress(partnerAddress);
-      } catch (geocodeError) {
-        if (geocodeError instanceof Error) {
-          setError(geocodeError.message);
-        } else {
-          setError(ERROR_MESSAGES.GEOCODING_FAILED);
+      // Geocode all partner addresses
+      const partnerLocations: Location[] = [];
+
+      for (const address of validAddresses) {
+        try {
+          const location = await geocodeAddress(address);
+          partnerLocations.push(location);
+        } catch (geocodeError) {
+          if (geocodeError instanceof Error) {
+            setError(geocodeError.message);
+          } else {
+            setError(ERROR_MESSAGES.GEOCODING_FAILED);
+          }
+          setLoading(false);
+          return;
         }
-        setLoading(false);
-        return;
       }
 
-      // Calculate midpoint based on road distance
+      // Calculate midpoint based on all locations (including user location)
       let midpoint;
       try {
-        // Use road-based midpoint calculation
-        midpoint = await calculateRoadMidpoint(userLocation, partnerLoc);
+        // Use multi-point midpoint calculation
+        const allLocations = [userLocation, ...partnerLocations];
+        midpoint = await calculateMultiPointMidpoint(allLocations, travelMode);
       } catch (midpointError) {
-        console.warn('Road midpoint calculation failed, falling back to simple midpoint', midpointError);
-        // Fallback to simple midpoint if road calculation fails
-        midpoint = calculateMidpoint(userLocation, partnerLoc);
+        console.warn('Multi-point midpoint calculation failed, falling back to simple midpoint', midpointError);
+        // Fallback to simple midpoint if calculation fails
+        const allLocations = [userLocation, ...partnerLocations];
+        midpoint = calculateMidpoint(allLocations);
       }
 
       // Update map region to show the midpoint
@@ -98,8 +130,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       let optimizedRestaurants;
       try {
         optimizedRestaurants = await findOptimalMeetingPlaces(
-          userLocation,
-          partnerLoc,
+          [userLocation, ...partnerLocations],
           travelMode,
           selectedCategories,
           20 // Maximum number of results
@@ -179,7 +210,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       navigation.navigate('Results', {
         restaurants: optimizedRestaurants,
         userLocation,
-        partnerLocation: partnerLoc,
+        partnerLocations: partnerLocations,
         midpointLocation: midpoint,
         travelMode: travelMode,
       });
@@ -225,11 +256,38 @@ function HomeScreen({ navigation }: HomeScreenProps) {
             )}
 
             <View style={styles.inputContainer}>
-              <LocationInput
-                value={partnerAddress}
-                onChangeText={setPartnerAddress}
-                placeholder="Enter partner's location..."
-              />
+              {/* Render address inputs */}
+              {partnerAddresses.map((address, index) => (
+                <View key={index} style={styles.addressInputRow}>
+                  <LocationInput
+                    value={address}
+                    onChangeText={(text) => updateAddress(index, text)}
+                    placeholder={`Enter ${index === 0 ? "partner's" : `additional person's`} location...`}
+                  />
+
+                  {/* Show remove button for all but the first address */}
+                  {index > 0 && (
+                    <TouchableOpacity
+                      style={styles.removeAddressButton}
+                      onPress={() => removeAddressInput(index)}
+                    >
+                      <Ionicons name="close-circle" size={24} color="red" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+
+              {/* Add Address button - only show if we have fewer than 3 addresses */}
+              {partnerAddresses.length < 3 && (
+                <TouchableOpacity
+                  style={styles.addAddressButton}
+                  onPress={addAddressInput}
+                >
+                  <Text style={styles.addAddressButtonText}>
+                    <Ionicons name="add-circle-outline" size={16} /> Add Another Address
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <TravelModePicker
                 selectedMode={travelMode}
@@ -244,10 +302,10 @@ function HomeScreen({ navigation }: HomeScreenProps) {
               <TouchableOpacity
                 style={[
                   styles.button,
-                  (!partnerAddress || loading) && styles.buttonDisabled
+                  (!partnerAddresses[0] || loading) && styles.buttonDisabled
                 ]}
                 onPress={handleSearch}
-                disabled={loading || !partnerAddress}
+                disabled={loading || !partnerAddresses[0]}
               >
                 <Text style={styles.buttonText}>
                   Find Meeting Point & Places

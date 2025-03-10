@@ -131,10 +131,25 @@ export const geocodeAddress = async (address: string): Promise<LocationType> => 
     }
 };
 
-export const calculateMidpoint = (locationA: LocationType, locationB: LocationType): LocationType => {
+/**
+ * Calculates the simple midpoint between two locations
+ */
+export const calculateMidpoint = (locations: LocationType[]): LocationType => {
+    if (locations.length === 0) {
+        throw new Error('No locations provided to calculate midpoint');
+    }
+
+    if (locations.length === 1) {
+        return locations[0];
+    }
+
+    // Calculate the average of all latitudes and longitudes
+    const totalLat = locations.reduce((sum, loc) => sum + loc.latitude, 0);
+    const totalLng = locations.reduce((sum, loc) => sum + loc.longitude, 0);
+
     return {
-        latitude: (locationA.latitude + locationB.latitude) / 2,
-        longitude: (locationA.longitude + locationB.longitude) / 2,
+        latitude: totalLat / locations.length,
+        longitude: totalLng / locations.length,
     };
 };
 
@@ -200,43 +215,107 @@ export const calculateRoadMidpoint = async (
 
         // If we get here, something went wrong with the calculation
         console.warn('Could not find exact road midpoint, falling back to simple midpoint');
-        return calculateMidpoint(locationA, locationB);
+        return calculateMidpoint([locationA, locationB]);
     } catch (error) {
         console.error('Error calculating road midpoint:', error);
         // Fallback to simple midpoint
         console.warn('Falling back to simple midpoint calculation');
-        return calculateMidpoint(locationA, locationB);
+        return calculateMidpoint([locationA, locationB]);
     }
 };
 
 /**
- * Finds optimal meeting places that minimize travel time difference between two people
+ * Calculates a midpoint between multiple locations (3 or more)
+ * Uses a weighted approach based on travel times between locations
+ */
+export const calculateMultiPointMidpoint = async (
+    locations: LocationType[],
+    travelMode: TravelMode = 'driving'
+): Promise<LocationType> => {
+    if (locations.length <= 1) {
+        throw new Error('Need at least 2 locations to calculate a midpoint');
+    }
+
+    if (locations.length === 2) {
+        // For two locations, use the road midpoint calculation
+        return calculateRoadMidpoint(locations[0], locations[1]);
+    }
+
+    try {
+        console.log(`Calculating midpoint between ${locations.length} locations`);
+
+        // Start with a simple geometric midpoint as our initial guess
+        let midpoint = calculateMidpoint(locations);
+
+        // We'll use an iterative approach to refine the midpoint
+        // This is a simplified version of the "weighted geometric median" algorithm
+
+        // First, calculate travel times from each location to our initial midpoint
+        const travelTimes: number[] = [];
+
+        for (const location of locations) {
+            try {
+                const travelInfo = await getTravelInfo(location, midpoint, travelMode);
+                const minutes = parseTravelTime(travelInfo.duration);
+                travelTimes.push(minutes);
+            } catch (error) {
+                console.warn('Error getting travel time, using default weight', error);
+                travelTimes.push(30); // Default 30 minutes if we can't get actual time
+            }
+        }
+
+        // Calculate total travel time
+        const totalTravelTime = travelTimes.reduce((sum, time) => sum + time, 0);
+
+        // If any location has more than 70% of the total travel time,
+        // shift the midpoint closer to that location
+        const maxTimeIndex = travelTimes.indexOf(Math.max(...travelTimes));
+        const maxTimePercentage = travelTimes[maxTimeIndex] / totalTravelTime;
+
+        if (maxTimePercentage > 0.7) {
+            // Shift midpoint 30% closer to the farthest location
+            const farLocation = locations[maxTimeIndex];
+            midpoint = {
+                latitude: midpoint.latitude + (farLocation.latitude - midpoint.latitude) * 0.3,
+                longitude: midpoint.longitude + (farLocation.longitude - midpoint.longitude) * 0.3
+            };
+        }
+
+        // Return the refined midpoint
+        return midpoint;
+    } catch (error) {
+        console.error('Error calculating multi-point midpoint:', error);
+        // Fallback to simple geometric midpoint
+        return calculateMidpoint(locations);
+    }
+};
+
+/**
+ * Finds optimal meeting places that minimize travel time difference between multiple people
  * and maximize venue quality.
  * 
- * @param locationA First person's location
- * @param locationB Second person's location
+ * @param locations Array of all participants' locations
  * @param travelMode Mode of transportation (driving, walking, etc.)
  * @param categories Types of places to search for
  * @param maxResults Maximum number of results to return
  * @returns Promise with array of ranked restaurants with travel info
  */
 export const findOptimalMeetingPlaces = async (
-    locationA: LocationType,
-    locationB: LocationType,
+    locations: LocationType[],
     travelMode: TravelMode,
     categories: PlaceCategory[],
     maxResults: number = 20
 ): Promise<Restaurant[]> => {
     try {
-        console.log(`Finding optimal meeting places between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
+        console.log(`Finding optimal meeting places between ${locations.length} locations`);
 
-        // First get an approximate midpoint using road distance
+        // First get an approximate midpoint using multi-point calculation
         let midpoint;
         try {
-            midpoint = await calculateRoadMidpoint(locationA, locationB);
+            midpoint = await calculateMultiPointMidpoint(locations, travelMode);
         } catch (error) {
-            console.warn('Road midpoint calculation failed, falling back to simple midpoint', error);
-            midpoint = calculateMidpoint(locationA, locationB);
+            console.warn('Multi-point midpoint calculation failed, falling back to simple midpoint', error);
+            midpoint = calculateMidpoint(locations);
         }
 
         // Search for venues near this midpoint for each category
@@ -283,7 +362,7 @@ export const findOptimalMeetingPlaces = async (
             throw new Error('No venues found near the midpoint');
         }
 
-        // For each venue, calculate travel times from both locations
+        // For each venue, calculate travel times from all locations
         const venuesWithTravelInfo = await Promise.all(
             allVenues.map(async (venue) => {
                 try {
@@ -292,18 +371,21 @@ export const findOptimalMeetingPlaces = async (
                         longitude: venue.longitude
                     };
 
-                    // Get travel info from location A to venue
-                    const travelInfoA = await getTravelInfo(locationA, venueLocation, travelMode);
-
-                    // Get travel info from location B to venue
-                    const travelInfoB = await getTravelInfo(locationB, venueLocation, travelMode);
+                    // Get travel info from all locations to venue
+                    const travelInfos = await Promise.all(
+                        locations.map(location => getTravelInfo(location, venueLocation, travelMode))
+                    );
 
                     // Parse travel times (convert "10 mins" to 10)
-                    const travelTimeA = parseTravelTime(travelInfoA.duration);
-                    const travelTimeB = parseTravelTime(travelInfoB.duration);
+                    const travelTimes = travelInfos.map(info => parseTravelTime(info.duration));
 
-                    // Calculate time difference (fairness metric)
-                    const timeDifference = Math.abs(travelTimeA - travelTimeB);
+                    // Calculate max time difference (fairness metric)
+                    const maxTime = Math.max(...travelTimes);
+                    const minTime = Math.min(...travelTimes);
+                    const timeDifference = maxTime - minTime;
+
+                    // Calculate average travel time
+                    const avgTravelTime = travelTimes.reduce((sum, time) => sum + time, 0) / travelTimes.length;
 
                     // Calculate a score based on:
                     // 1. Low time difference (more fair)
@@ -311,44 +393,47 @@ export const findOptimalMeetingPlaces = async (
                     // 3. Total travel time (lower is better)
                     const fairnessScore = 100 - Math.min(timeDifference, 100); // 0-100, higher is better
                     const ratingScore = (venue.rating || 3) * 20; // 0-100, higher is better
-                    const totalTimeScore = 100 - Math.min((travelTimeA + travelTimeB) / 2, 100); // 0-100, higher is better
+                    const totalTimeScore = 100 - Math.min(avgTravelTime, 100); // 0-100, higher is better
 
                     // Weighted score (can be adjusted based on priorities)
                     const score = (fairnessScore * 0.5) + (ratingScore * 0.3) + (totalTimeScore * 0.2);
 
+                    // Store travel info for the first location (user) for display purposes
+                    const userTravelInfo = travelInfos[0];
+
                     return {
                         ...venue,
-                        travelTimeA,
-                        travelTimeB,
+                        travelTimes,
                         timeDifference,
-                        totalTravelTime: travelTimeA + travelTimeB,
+                        avgTravelTime,
                         fairnessScore,
                         score,
                         // Add formatted travel info for display
-                        distanceA: travelInfoA.distance,
-                        durationA: travelInfoA.duration,
-                        distanceB: travelInfoB.distance,
-                        durationB: travelInfoB.duration,
-                        // Use the average for the main distance/duration fields
-                        distance: travelInfoA.distance, // We'll use person A's distance as the reference
-                        duration: travelInfoA.duration, // We'll use person A's duration as the reference
+                        distance: userTravelInfo.distance,
+                        duration: userTravelInfo.duration,
+                        // Add travel info for each location
+                        travelInfos: travelInfos.map((info, index) => ({
+                            locationIndex: index,
+                            distance: info.distance,
+                            duration: info.duration
+                        }))
                     };
                 } catch (error) {
                     console.error(`Error calculating travel info for ${venue.name}:`, error);
                     return {
                         ...venue,
-                        travelTimeA: 9999,
-                        travelTimeB: 9999,
+                        travelTimes: Array(locations.length).fill(9999),
                         timeDifference: 9999,
-                        totalTravelTime: 9999,
+                        avgTravelTime: 9999,
                         fairnessScore: 0,
                         score: 0,
-                        distanceA: 'Unknown',
-                        durationA: 'Unknown',
-                        distanceB: 'Unknown',
-                        durationB: 'Unknown',
                         distance: 'Unknown',
                         duration: 'Unknown',
+                        travelInfos: locations.map((_, index) => ({
+                            locationIndex: index,
+                            distance: 'Unknown',
+                            duration: 'Unknown'
+                        }))
                     };
                 }
             })
@@ -368,7 +453,7 @@ export const findOptimalMeetingPlaces = async (
 /**
  * Helper function to get travel information between two locations
  */
-const getTravelInfo = async (
+export const getTravelInfo = async (
     origin: LocationType,
     destination: LocationType,
     mode: TravelMode
@@ -402,7 +487,7 @@ const getTravelInfo = async (
 /**
  * Helper function to parse travel time from string format (e.g., "10 mins" -> 10)
  */
-const parseTravelTime = (durationText: string): number => {
+export const parseTravelTime = (durationText: string): number => {
     if (durationText === 'Unknown') return 9999;
 
     // Extract numbers from the duration text

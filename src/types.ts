@@ -16,16 +16,16 @@ export interface Restaurant {
     totalRatings?: number;
     priceLevel?: number;
     types?: string[];
-    travelTimeA?: number;
-    travelTimeB?: number;
+    travelTimes?: number[];
     timeDifference?: number;
-    totalTravelTime?: number;
+    avgTravelTime?: number;
     fairnessScore?: number;
     score?: number;
-    distanceA?: string;
-    durationA?: string;
-    distanceB?: string;
-    durationB?: string;
+    travelInfos?: {
+        locationIndex: number;
+        distance: string;
+        duration: string;
+    }[];
 }
 
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'bicycling';
@@ -52,7 +52,7 @@ export type RootStackParamList = {
     Results: {
         restaurants: Restaurant[];
         userLocation: Location;
-        partnerLocation: Location;
+        partnerLocations: Location[];
         midpointLocation: Location;
         travelMode: TravelMode;
     };
