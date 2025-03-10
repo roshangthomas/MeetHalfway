@@ -8,52 +8,66 @@ export const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingTop: 16,
     },
-    sortContainer: {
-        marginBottom: 16,
+    // Filter and sort bar styles
+    filterSortBar: {
         backgroundColor: COLORS.SURFACE,
-        borderRadius: 16,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
-        marginHorizontal: 16,
     },
-    sortLabel: {
-        fontSize: 18,
-        fontWeight: '600',
-        marginBottom: 16,
-        color: COLORS.TEXT,
-    },
-    sortButtons: {
-        flexDirection: 'row',
-        flexWrap: 'nowrap', // Prevent wrapping
-    },
-    sortButton: {
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        borderRadius: 24,
+    divider: {
+        height: 1,
         backgroundColor: COLORS.GRAY_LIGHT,
+        width: '100%',
+    },
+    filterSortButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+    },
+    filterSortButton: {
+        flex: 1,
+        flexDirection: 'row',
         justifyContent: 'center',
-        marginRight: 10, // Add spacing between buttons
+        alignItems: 'center',
+        paddingVertical: 8,
     },
-    sortButtonActive: {
-        backgroundColor: COLORS.PRIMARY,
-    },
-    sortButtonText: {
-        fontSize: 16,
+    filterSortButtonText: {
+        fontSize: 20,
+        fontWeight: '500',
         color: COLORS.TEXT,
+        marginRight: 8,
     },
-    sortButtonTextActive: {
-        color: COLORS.SURFACE,
+    filterIcon: {
+        fontSize: 24,
+        color: COLORS.TEXT,
+        marginLeft: 4,
+        fontWeight: '300',
+    },
+    sortIconBox: {
+        width: 36,
+        height: 36,
+        backgroundColor: '#EEEEEE',
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
+    },
+    sortIconText: {
+        fontSize: 20,
+        color: COLORS.TEXT,
         fontWeight: '600',
     },
+    verticalDivider: {
+        width: 1,
+        height: '70%',
+        backgroundColor: COLORS.GRAY_LIGHT,
+        marginHorizontal: 8,
+    },
+    // List container styles
     listContainer: {
         flex: 1,
+        marginTop: 8,
     },
     noResultsContainer: {
         padding: 20,
