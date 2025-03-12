@@ -230,12 +230,12 @@ export const findOptimalMeetingPlaces = async (
     try {
         console.log(`Finding optimal meeting places between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
 
-        // First get an approximate midpoint using road distance
+        // Use the new practical midpoint function instead of road midpoint
         let midpoint;
         try {
-            midpoint = await calculateRoadMidpoint(locationA, locationB);
+            midpoint = await findPracticalMidpoint(locationA, locationB, travelMode);
         } catch (error) {
-            console.warn('Road midpoint calculation failed, falling back to simple midpoint', error);
+            console.warn('Practical midpoint calculation failed, falling back to simple midpoint', error);
             midpoint = calculateMidpoint(locationA, locationB);
         }
 
@@ -417,5 +417,166 @@ const parseTravelTime = (durationText: string): number => {
     } else {
         // Handle minutes only format (e.g., "20 mins")
         return parseInt(matches[0], 10) || 0;
+    }
+};
+
+/**
+ * Finds a practical midpoint between two locations that is suitable for meeting.
+ * This function:
+ * 1. Calculates the road midpoint
+ * 2. Checks for suitable venues nearby
+ * 3. Expands search if needed
+ * 4. Scores venues based on travel fairness, total travel time, and venue quality
+ * 
+ * @param locationA First person's location
+ * @param locationB Second person's location
+ * @param travelMode Mode of transportation (driving, walking, etc.)
+ * @returns Promise with the most practical meeting point
+ */
+export const findPracticalMidpoint = async (
+    locationA: LocationType,
+    locationB: LocationType,
+    travelMode: TravelMode = 'driving'
+): Promise<LocationType> => {
+    try {
+        console.log(`Finding practical midpoint between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
+
+        // Step 1: Calculate road midpoint
+        let roadMidpoint;
+        try {
+            roadMidpoint = await calculateRoadMidpoint(locationA, locationB);
+        } catch (error) {
+            console.warn('Road midpoint calculation failed, falling back to simple midpoint', error);
+            roadMidpoint = calculateMidpoint(locationA, locationB);
+        }
+
+        // Define venue types that are suitable for meetings
+        const venueTypes = [
+            'restaurant', 'cafe', 'bar', 'shopping_mall', 'department_store',
+            'supermarket', 'bakery', 'library', 'park', 'book_store'
+        ].join('|');
+
+        // Step 2: Search for venues with progressively larger radii until we find some
+        let venues: any[] = [];
+        const searchRadii = [500, 1500, 3000, 5000, 10000, 15000]; // Increasing search radii in meters
+
+        for (const radius of searchRadii) {
+            console.log(`Searching for venues within ${radius}m of midpoint`);
+            venues = await searchNearbyVenues(roadMidpoint, radius, venueTypes);
+
+            if (venues.length > 0) {
+                console.log(`Found ${venues.length} venues within ${radius}m`);
+                break;
+            }
+        }
+
+        // If still no venues, return the road midpoint
+        if (venues.length === 0) {
+            console.log('No venues found in any search radius, returning road midpoint');
+            return roadMidpoint;
+        }
+
+        // Step 4: Score venues based on multiple factors
+        const scoredVenues = await Promise.all(
+            venues.map(async (venue) => {
+                const venueLocation = {
+                    latitude: venue.geometry.location.lat,
+                    longitude: venue.geometry.location.lng
+                };
+
+                // Get travel info from both locations
+                const travelInfoA = await getTravelInfo(locationA, venueLocation, travelMode);
+                const travelInfoB = await getTravelInfo(locationB, venueLocation, travelMode);
+
+                // Parse travel times
+                const travelTimeA = parseTravelTime(travelInfoA.duration);
+                const travelTimeB = parseTravelTime(travelInfoB.duration);
+
+                // Calculate metrics
+                const timeDifference = Math.abs(travelTimeA - travelTimeB);
+                const totalTravelTime = travelTimeA + travelTimeB;
+
+                // Venue quality factors
+                const rating = venue.rating || 3;
+                const userRatingsTotal = venue.user_ratings_total || 0;
+
+                // Check if venue is on a major road (using types)
+                const isOnMajorRoad = venue.types?.some((type: string) =>
+                    ['route', 'street_address', 'point_of_interest'].includes(type)
+                ) || false;
+
+                // Calculate scores (0-100 scale for each component)
+                const fairnessScore = 100 - Math.min(timeDifference, 100); // Lower difference is better
+                const travelTimeScore = 100 - Math.min(totalTravelTime / 2, 100); // Lower total time is better
+                const qualityScore = Math.min((rating * 20) * (Math.min(userRatingsTotal, 100) / 100), 100); // Higher rating and more reviews is better
+                const accessibilityScore = isOnMajorRoad ? 100 : 50; // Bonus for being on major road
+
+                // Weighted total score (adjust weights based on priorities)
+                const totalScore = (
+                    (fairnessScore * 0.35) +
+                    (travelTimeScore * 0.30) +
+                    (qualityScore * 0.25) +
+                    (accessibilityScore * 0.10)
+                );
+
+                return {
+                    location: venueLocation,
+                    name: venue.name,
+                    score: totalScore,
+                    fairnessScore,
+                    travelTimeScore,
+                    qualityScore,
+                    accessibilityScore,
+                    travelTimeA,
+                    travelTimeB,
+                    rating
+                };
+            })
+        );
+
+        // Sort venues by score (highest first)
+        scoredVenues.sort((a, b) => b.score - a.score);
+
+        // Log the top venue for debugging
+        if (scoredVenues.length > 0) {
+            const topVenue = scoredVenues[0];
+            console.log(`Selected practical midpoint: ${topVenue.name} with score ${topVenue.score.toFixed(2)}`);
+            console.log(`Travel times: Person A: ${topVenue.travelTimeA}min, Person B: ${topVenue.travelTimeB}min`);
+        }
+
+        // Return the location of the highest-scoring venue
+        return scoredVenues.length > 0 ? scoredVenues[0].location : roadMidpoint;
+    } catch (error) {
+        console.error('Error finding practical midpoint:', error);
+        // Fallback to simple midpoint in case of error
+        return calculateMidpoint(locationA, locationB);
+    }
+};
+
+/**
+ * Helper function to search for venues near a location
+ */
+const searchNearbyVenues = async (
+    location: LocationType,
+    radius: number,
+    types: string
+): Promise<any[]> => {
+    try {
+        const response = await axios.get<GooglePlacesResponse>(
+            `https://maps.googleapis.com/maps/api/place/nearbysearch/json?` +
+            `location=${location.latitude},${location.longitude}` +
+            `&radius=${radius}` +
+            `&type=${types}` +
+            `&key=${GOOGLE_MAPS_API_KEY}`
+        );
+
+        if (response.data.status !== 'OK' || !response.data.results) {
+            return [];
+        }
+
+        return response.data.results;
+    } catch (error) {
+        console.error('Error searching for nearby venues:', error);
+        return [];
     }
 }; 
