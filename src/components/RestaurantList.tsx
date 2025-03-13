@@ -8,13 +8,15 @@ import {
     Dimensions,
     Platform,
     TouchableOpacity,
+    Linking,
 } from 'react-native';
 import { Restaurant, Location, TravelMode } from '../types';
 import { COLORS } from '../constants/colors';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { RatingDisplay } from './RatingDisplay';
+import { PlaceImage } from './PlaceImage';
 
 interface RestaurantListProps {
     restaurants: Restaurant[];
@@ -78,21 +80,37 @@ const RestaurantCard: React.FC<{
             );
         };
 
+        const openMapsApp = (restaurant: Restaurant) => {
+            const { latitude, longitude, name } = restaurant;
+            const label = encodeURIComponent(name || 'Restaurant');
+
+            let url;
+            if (Platform.OS === 'ios') {
+                url = `maps:0,0?q=${label}@${latitude},${longitude}`;
+            } else {
+                url = `geo:0,0?q=${latitude},${longitude}(${label})`;
+            }
+
+            Linking.canOpenURL(url).then(supported => {
+                if (supported) {
+                    Linking.openURL(url);
+                } else {
+                    // Fallback to Google Maps web URL
+                    const webUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+                    Linking.openURL(webUrl);
+                }
+            });
+        };
+
         return (
             <TouchableOpacity
                 style={styles.card}
-                onPress={handlePress}
+                onPress={() => openMapsApp(restaurant)}
                 activeOpacity={0.7}
             >
-                <Image
-                    source={
-                        restaurant.photoUrl
-                            ? { uri: restaurant.photoUrl }
-                            : require('../../assets/placeholder-restaurant.png')
-                    }
-                    style={styles.image}
-                    resizeMode="cover"
-                />
+                <View style={styles.imageContainer}>
+                    <PlaceImage photoUrl={restaurant.photoUrl} types={restaurant.types} style={styles.image} />
+                </View>
                 {renderFairnessBadge()}
                 <View style={styles.contentContainer}>
                     <Text style={styles.name}>{restaurant.name}</Text>
@@ -208,10 +226,16 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
     },
-    image: {
+    imageContainer: {
         width: '100%',
         height: 200,
         backgroundColor: COLORS.GRAY_LIGHT,
+    },
+    image: {
+        width: '100%',
+        height: '100%',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
     },
     contentContainer: {
         padding: 16,

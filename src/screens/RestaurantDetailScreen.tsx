@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { Restaurant, Location, TravelMode } from '../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { PlaceImage } from '../components/PlaceImage';
 
 type RestaurantDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
 
@@ -100,15 +101,13 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView style={styles.scrollView}>
-                <Image
-                    source={
-                        restaurant.photoUrl
-                            ? { uri: restaurant.photoUrl }
-                            : require('../../assets/placeholder-restaurant.png')
-                    }
-                    style={styles.heroImage}
-                    resizeMode="cover"
-                />
+                <View style={styles.heroImageContainer}>
+                    <PlaceImage
+                        photoUrl={restaurant.photoUrl}
+                        types={restaurant.types}
+                        style={styles.heroImage}
+                    />
+                </View>
 
                 <View style={styles.content}>
                     <Text style={styles.name}>{restaurant.name}</Text>
@@ -181,9 +180,13 @@ const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
     },
-    heroImage: {
+    heroImageContainer: {
         width: '100%',
         height: 250,
+    },
+    heroImage: {
+        width: '100%',
+        height: '100%',
         backgroundColor: COLORS.GRAY_LIGHT,
     },
     content: {
