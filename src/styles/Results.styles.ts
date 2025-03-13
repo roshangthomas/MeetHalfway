@@ -38,12 +38,6 @@ export const styles = StyleSheet.create({
         color: COLORS.TEXT,
         marginRight: 8,
     },
-    filterIcon: {
-        fontSize: 24,
-        color: COLORS.TEXT,
-        marginLeft: 4,
-        fontWeight: '300',
-    },
     sortIconBox: {
         width: 36,
         height: 36,

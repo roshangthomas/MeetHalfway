@@ -8,6 +8,7 @@ import { COLORS } from '../constants/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { FilterModal, FilterOptions } from '../components/FilterModal';
 import { FontAwesome } from '@expo/vector-icons';
+import { AntDesign } from '@expo/vector-icons';
 import { SortModal } from '../components/SortModal';
 import * as Font from 'expo-font';
 
@@ -31,7 +32,8 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         async function loadFonts() {
             await Font.loadAsync({
                 ...FontAwesome.font,
-                ...Ionicons.font
+                ...Ionicons.font,
+                ...AntDesign.font
             });
             setFontsLoaded(true);
         }
@@ -161,7 +163,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                             <Text style={styles.filterSortButtonText}>
                                 Filters{getActiveFilterCount() > 0 ? ` (${getActiveFilterCount()})` : ''}
                             </Text>
-                            <Text style={styles.filterIcon}>≡</Text>
+                            <AntDesign name="filter" size={10} color={COLORS.TEXT} />
                         </TouchableOpacity>
 
                         <View style={styles.verticalDivider} />
