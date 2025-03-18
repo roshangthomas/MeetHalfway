@@ -163,7 +163,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                             <Text style={styles.filterSortButtonText}>
                                 Filters{getActiveFilterCount() > 0 ? ` (${getActiveFilterCount()})` : ''}
                             </Text>
-                            <AntDesign name="filter" size={10} color={COLORS.TEXT} />
+                            <FontAwesome name="filter" size={20} color="black" />
                         </TouchableOpacity>
 
                         <View style={styles.verticalDivider} />
@@ -175,9 +175,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                             <Text style={styles.filterSortButtonText}>
                                 Sort: {getSortOptionDisplayName()}
                             </Text>
-                            <View style={styles.sortIconBox}>
-                                <Text style={styles.sortIconText}>↕</Text>
-                            </View>
+                            <FontAwesome name="sort" size={20} color={COLORS.TEXT} />
                         </TouchableOpacity>
                     </View>
 
