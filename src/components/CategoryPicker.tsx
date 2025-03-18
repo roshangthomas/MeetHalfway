@@ -38,30 +38,31 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
             </View>
             <View style={styles.categoryGrid}>
                 {categories.map((category) => (
-                    <TouchableOpacity
-                        key={category}
-                        style={[
-                            styles.categoryButton,
-                            selectedCategories.includes(category) && styles.selectedCategory,
-                            selectedCategories.length >= MAX_CATEGORIES &&
-                            !selectedCategories.includes(category) &&
-                            styles.disabledCategory,
-                        ]}
-                        onPress={() => handleToggleCategory(category)}
-                        disabled={selectedCategories.length >= MAX_CATEGORIES && !selectedCategories.includes(category)}
-                    >
-                        <Text
+                    <View key={category} style={styles.categoryButton}>
+                        <TouchableOpacity
                             style={[
-                                styles.categoryText,
-                                selectedCategories.includes(category) && styles.selectedCategoryText,
+                                styles.categoryButtonInner,
+                                selectedCategories.includes(category) && styles.selectedCategory,
                                 selectedCategories.length >= MAX_CATEGORIES &&
                                 !selectedCategories.includes(category) &&
-                                styles.disabledCategoryText,
+                                styles.disabledCategory,
                             ]}
+                            onPress={() => handleToggleCategory(category)}
+                            disabled={selectedCategories.length >= MAX_CATEGORIES && !selectedCategories.includes(category)}
                         >
-                            {PLACE_CATEGORY_LABELS[category]}
-                        </Text>
-                    </TouchableOpacity>
+                            <Text
+                                style={[
+                                    styles.categoryText,
+                                    selectedCategories.includes(category) && styles.selectedCategoryText,
+                                    selectedCategories.length >= MAX_CATEGORIES &&
+                                    !selectedCategories.includes(category) &&
+                                    styles.disabledCategoryText,
+                                ]}
+                            >
+                                {PLACE_CATEGORY_LABELS[category]}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 ))}
             </View>
         </View>
@@ -92,10 +93,14 @@ const styles = StyleSheet.create({
     categoryGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
+        marginHorizontal: -4,
     },
     categoryButton: {
-        flexBasis: '48%',
+        width: '50%',
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+    },
+    categoryButtonInner: {
         backgroundColor: COLORS.SURFACE,
         paddingVertical: 12,
         paddingHorizontal: 8,
