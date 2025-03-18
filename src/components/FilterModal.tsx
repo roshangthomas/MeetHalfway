@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -38,6 +38,19 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     availableCuisineTypes
 }) => {
     const [filters, setFilters] = useState<FilterOptions>(initialFilters);
+    const [tempRating, setTempRating] = useState(initialFilters.minRating);
+    const [tempPrice, setTempPrice] = useState(initialFilters.maxPrice);
+
+    // Add refs to track if the user is currently sliding
+    const ratingSliderActive = useRef(false);
+    const priceSliderActive = useRef(false);
+
+    // Synchronize state when initialFilters change
+    useEffect(() => {
+        setTempRating(initialFilters.minRating);
+        setTempPrice(initialFilters.maxPrice);
+        setFilters(initialFilters);
+    }, [initialFilters]);
 
     const handleReset = () => {
         setFilters({
@@ -46,6 +59,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             maxPrice: 4,
             cuisineTypes: []
         });
+        setTempRating(0);
+        setTempPrice(4);
     };
 
     const toggleCuisineType = (cuisineType: string) => {
@@ -119,19 +134,50 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                 <View style={styles.filterSection}>
                                     <Text style={styles.filterTitle}>Minimum Rating</Text>
                                     <View style={styles.sliderContainer}>
-                                        {renderStars(filters.minRating)}
-                                        <Slider
-                                            style={styles.slider}
-                                            minimumValue={0}
-                                            maximumValue={5}
-                                            step={0.5}
-                                            value={filters.minRating}
-                                            onValueChange={(value: number) => setFilters({ ...filters, minRating: value })}
-                                            minimumTrackTintColor={COLORS.PRIMARY}
-                                            maximumTrackTintColor={COLORS.GRAY_LIGHT}
-                                            thumbTintColor={COLORS.PRIMARY}
-                                        />
-                                        <Text style={styles.sliderValue}>{filters.minRating} stars or more</Text>
+                                        {renderStars(tempRating)}
+                                        {Platform.OS === 'android' ? (
+                                            <Slider
+                                                style={styles.slider}
+                                                minimumValue={0}
+                                                maximumValue={5}
+                                                step={1}
+                                                value={tempRating}
+                                                onSlidingStart={() => {
+                                                    ratingSliderActive.current = true;
+                                                }}
+                                                onValueChange={(value: number) => {
+                                                    if (ratingSliderActive.current) {
+                                                        setTempRating(value);
+                                                    }
+                                                }}
+                                                onSlidingComplete={(value: number) => {
+                                                    ratingSliderActive.current = false;
+                                                    setTempRating(value);
+                                                    setFilters(prev => ({ ...prev, minRating: value }));
+                                                }}
+                                                minimumTrackTintColor={COLORS.PRIMARY}
+                                                maximumTrackTintColor={COLORS.GRAY_LIGHT}
+                                                thumbTintColor={COLORS.PRIMARY}
+                                            />
+                                        ) : (
+                                            <Slider
+                                                style={styles.slider}
+                                                minimumValue={0}
+                                                maximumValue={5}
+                                                step={1}
+                                                value={tempRating}
+                                                onValueChange={(value: number) => {
+                                                    setTempRating(value);
+                                                }}
+                                                onSlidingComplete={(value: number) => {
+                                                    setFilters(prev => ({ ...prev, minRating: value }));
+                                                }}
+                                                minimumTrackTintColor={COLORS.PRIMARY}
+                                                maximumTrackTintColor={COLORS.GRAY_LIGHT}
+                                                thumbTintColor={COLORS.PRIMARY}
+                                            />
+                                        )}
+                                        <Text style={styles.sliderValue}>{tempRating} stars or more</Text>
                                     </View>
                                 </View>
 
@@ -140,34 +186,89 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                     <Text style={styles.filterTitle}>Minimum Reviews</Text>
                                     <View style={styles.inputContainer}>
                                         <TextInput
-                                            style={styles.textInput}
+                                            style={[
+                                                styles.textInput,
+                                                filters.minReviews < 0 && styles.textInputError
+                                            ]}
                                             keyboardType="number-pad"
-                                            value={filters.minReviews.toString()}
+                                            value={filters.minReviews.toString() === "0" ? "" : filters.minReviews.toString()}
                                             onChangeText={(text) => {
-                                                const value = parseInt(text) || 0;
-                                                setFilters({ ...filters, minReviews: value });
+                                                // Handle empty text case
+                                                if (text === "") {
+                                                    setFilters({ ...filters, minReviews: 0 });
+                                                    return;
+                                                }
+
+                                                const value = parseInt(text);
+                                                // Validate the input
+                                                if (isNaN(value)) {
+                                                    return;
+                                                }
+
+                                                // Check for negative values
+                                                if (value < 0) {
+                                                    setFilters({ ...filters, minReviews: -1 }); // Setting to -1 to indicate error
+                                                } else {
+                                                    setFilters({ ...filters, minReviews: value });
+                                                }
                                             }}
+                                            placeholder="0"
+                                            placeholderTextColor={COLORS.GRAY_LIGHT}
                                         />
                                         <Text style={styles.inputLabel}>reviews or more</Text>
                                     </View>
+                                    {filters.minReviews < 0 && (
+                                        <Text style={styles.errorText}>Please enter a valid number (0 or greater)</Text>
+                                    )}
                                 </View>
 
                                 {/* Price Level Filter */}
                                 <View style={styles.filterSection}>
                                     <Text style={styles.filterTitle}>Maximum Price Level</Text>
                                     <View style={styles.sliderContainer}>
-                                        {renderPriceLevel(filters.maxPrice)}
-                                        <Slider
-                                            style={styles.slider}
-                                            minimumValue={1}
-                                            maximumValue={4}
-                                            step={1}
-                                            value={filters.maxPrice}
-                                            onValueChange={(value: number) => setFilters({ ...filters, maxPrice: value })}
-                                            minimumTrackTintColor={COLORS.PRIMARY}
-                                            maximumTrackTintColor={COLORS.GRAY_LIGHT}
-                                            thumbTintColor={COLORS.PRIMARY}
-                                        />
+                                        {renderPriceLevel(tempPrice)}
+                                        {Platform.OS === 'android' ? (
+                                            <Slider
+                                                style={styles.slider}
+                                                minimumValue={1}
+                                                maximumValue={4}
+                                                step={1}
+                                                value={tempPrice}
+                                                onSlidingStart={() => {
+                                                    priceSliderActive.current = true;
+                                                }}
+                                                onValueChange={(value: number) => {
+                                                    if (priceSliderActive.current) {
+                                                        setTempPrice(value);
+                                                    }
+                                                }}
+                                                onSlidingComplete={(value: number) => {
+                                                    priceSliderActive.current = false;
+                                                    setTempPrice(value);
+                                                    setFilters(prev => ({ ...prev, maxPrice: value }));
+                                                }}
+                                                minimumTrackTintColor={COLORS.PRIMARY}
+                                                maximumTrackTintColor={COLORS.GRAY_LIGHT}
+                                                thumbTintColor={COLORS.PRIMARY}
+                                            />
+                                        ) : (
+                                            <Slider
+                                                style={styles.slider}
+                                                minimumValue={1}
+                                                maximumValue={4}
+                                                step={1}
+                                                value={tempPrice}
+                                                onValueChange={(value: number) => {
+                                                    setTempPrice(value);
+                                                }}
+                                                onSlidingComplete={(value: number) => {
+                                                    setFilters(prev => ({ ...prev, maxPrice: value }));
+                                                }}
+                                                minimumTrackTintColor={COLORS.PRIMARY}
+                                                maximumTrackTintColor={COLORS.GRAY_LIGHT}
+                                                thumbTintColor={COLORS.PRIMARY}
+                                            />
+                                        )}
                                     </View>
                                 </View>
 
@@ -205,8 +306,17 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                     <Text style={styles.resetButtonText}>Reset</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={styles.applyButton}
-                                    onPress={() => onApply(filters)}
+                                    style={[
+                                        styles.applyButton,
+                                        filters.minReviews < 0 && styles.applyButtonDisabled
+                                    ]}
+                                    onPress={() => {
+                                        // Don't apply if there are validation errors
+                                        if (filters.minReviews < 0) {
+                                            return;
+                                        }
+                                        onApply(filters);
+                                    }}
                                 >
                                     <Text style={styles.applyButtonText}>Apply Filters</Text>
                                 </TouchableOpacity>
@@ -363,5 +473,16 @@ const styles = StyleSheet.create({
         color: COLORS.SURFACE,
         fontSize: 16,
         fontWeight: '600',
+    },
+    textInputError: {
+        borderColor: COLORS.ERROR || '#FF3B30',
+    },
+    errorText: {
+        color: COLORS.ERROR || '#FF3B30',
+        fontSize: 14,
+        marginTop: 5,
+    },
+    applyButtonDisabled: {
+        backgroundColor: COLORS.GRAY_LIGHT,
     },
 }); 
