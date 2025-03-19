@@ -1,15 +1,39 @@
-import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { Restaurant, Location, TravelMode } from '../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { getPlaceDetails } from '../services/places';
 
 type RestaurantDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
 
 export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ route, navigation }) => {
     const { restaurant, userLocation, travelMode = 'driving' } = route.params;
+    const [detailedRestaurant, setDetailedRestaurant] = useState<Restaurant>(restaurant);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Fetch place details when the component mounts
+    useEffect(() => {
+        const fetchPlaceDetails = async () => {
+            try {
+                setIsLoading(true);
+                const details = await getPlaceDetails(restaurant.id);
+                setDetailedRestaurant({
+                    ...restaurant,
+                    phoneNumber: details.phoneNumber,
+                    businessHours: details.businessHours
+                });
+            } catch (error) {
+                console.error('Failed to fetch place details:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchPlaceDetails();
+    }, [restaurant.id]);
 
     const renderRatingStars = (rating?: number) => {
         if (!rating) return null;
@@ -97,13 +121,143 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         }
     };
 
+    const callRestaurant = () => {
+        if (detailedRestaurant.phoneNumber) {
+            Linking.openURL(`tel:${detailedRestaurant.phoneNumber}`);
+        }
+    };
+
+    // Add a function to format and parse business hours
+    const renderBusinessHours = () => {
+        if (!detailedRestaurant.businessHours || detailedRestaurant.businessHours.length === 0) {
+            return null;
+        }
+
+        // Get current day of week (0 = Sunday, 1 = Monday, etc.)
+        const today = new Date().getDay();
+        // Convert to Google's format (0 = Monday, 6 = Sunday)
+        const googleToday = today === 0 ? 6 : today - 1;
+
+        return (
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Business Hours</Text>
+                <View style={styles.hoursContainer}>
+                    {detailedRestaurant.businessHours.map((hourString, index) => {
+                        // Split the day and hours (e.g., "Monday: 9:00 AM – 10:00 PM")
+                        const [day, hours] = hourString.split(': ');
+                        const isToday = index === googleToday;
+
+                        return (
+                            <View
+                                key={index}
+                                style={[
+                                    styles.hourRow,
+                                    isToday && styles.todayRow
+                                ]}
+                            >
+                                <Text style={[
+                                    styles.dayText,
+                                    isToday && styles.todayText
+                                ]}>
+                                    {day}
+                                </Text>
+                                <Text style={[
+                                    styles.timeText,
+                                    isToday && styles.todayText
+                                ]}>
+                                    {hours}
+                                </Text>
+                            </View>
+                        );
+                    })}
+                </View>
+            </View>
+        );
+    };
+
+    // Function to determine if restaurant is currently open
+    const isRestaurantOpen = (): boolean | null => {
+        if (!detailedRestaurant.businessHours || detailedRestaurant.businessHours.length === 0) {
+            return null; // Unknown status
+        }
+
+        const now = new Date();
+        const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        // Convert to Google's format (0 = Monday, 6 = Sunday)
+        const googleDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+        // Get hours for today
+        const todayHours = detailedRestaurant.businessHours[googleDayIndex];
+        if (!todayHours || todayHours.includes('Closed')) {
+            return false; // Closed today
+        }
+
+        // Parse hours (e.g., "Monday: 9:00 AM – 10:00 PM")
+        const hoursMatch = todayHours.match(/(\d+:\d+\s*(?:AM|PM))\s*–\s*(\d+:\d+\s*(?:AM|PM))/i);
+        if (!hoursMatch) {
+            return null; // Can't determine
+        }
+
+        const [_, openTime, closeTime] = hoursMatch;
+
+        // Convert current time, open time, and close time to minutes since midnight
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const openMinutes = convertTimeToMinutes(openTime);
+        const closeMinutes = convertTimeToMinutes(closeTime);
+
+        return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+    };
+
+    // Helper to convert time string to minutes since midnight
+    const convertTimeToMinutes = (timeStr: string): number => {
+        // Clean up the time string
+        const cleanTimeStr = timeStr.trim().toUpperCase();
+
+        // Parse hours and minutes
+        const [hourMin, period] = cleanTimeStr.split(/\s+/);
+        const [hours, minutes] = hourMin.split(':').map(Number);
+
+        // Convert to 24-hour format
+        let totalHours = hours;
+        if (period === 'PM' && hours < 12) {
+            totalHours += 12;
+        } else if (period === 'AM' && hours === 12) {
+            totalHours = 0;
+        }
+
+        return totalHours * 60 + minutes;
+    };
+
+    // Render open/closed status badge
+    const renderOpenStatusBadge = () => {
+        const openStatus = isRestaurantOpen();
+
+        if (openStatus === null) {
+            return null; // Don't show if we can't determine
+        }
+
+        return (
+            <View style={[
+                styles.statusBadge,
+                openStatus ? styles.openBadge : styles.closedBadge
+            ]}>
+                <Text style={[
+                    styles.statusText,
+                    openStatus ? styles.openText : styles.closedText
+                ]}>
+                    {openStatus ? 'Open' : 'Closed'}
+                </Text>
+            </View>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView style={styles.scrollView}>
                 <Image
                     source={
-                        restaurant.photoUrl
-                            ? { uri: restaurant.photoUrl }
+                        detailedRestaurant.photoUrl
+                            ? { uri: detailedRestaurant.photoUrl }
                             : require('../../assets/placeholder-restaurant.png')
                     }
                     style={styles.heroImage}
@@ -111,16 +265,19 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                 />
 
                 <View style={styles.content}>
-                    <Text style={styles.name}>{restaurant.name}</Text>
-
-                    <View style={styles.ratingRow}>
-                        {renderRatingStars(restaurant.rating)}
-                        {renderPriceLevel(restaurant.priceLevel)}
+                    <View style={styles.nameContainer}>
+                        <Text style={styles.name}>{detailedRestaurant.name}</Text>
+                        {!isLoading && renderOpenStatusBadge()}
                     </View>
 
-                    {restaurant.types && (
+                    <View style={styles.ratingRow}>
+                        {renderRatingStars(detailedRestaurant.rating)}
+                        {renderPriceLevel(detailedRestaurant.priceLevel)}
+                    </View>
+
+                    {detailedRestaurant.types && (
                         <View style={styles.tagsContainer}>
-                            {restaurant.types.slice(0, 3).map((type, index) => (
+                            {detailedRestaurant.types.slice(0, 3).map((type, index) => (
                                 <View key={index} style={styles.tag}>
                                     <Text style={styles.tagText}>
                                         {type.replace(/_/g, ' ')}
@@ -132,25 +289,48 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Location</Text>
-                        {restaurant.address && (
-                            <Text style={styles.address}>{restaurant.address}</Text>
+                        {detailedRestaurant.address && (
+                            <Text style={styles.address}>{detailedRestaurant.address}</Text>
                         )}
 
                         <View style={styles.travelInfo}>
-                            {restaurant.distance && (
+                            {detailedRestaurant.distance && (
                                 <Text style={styles.travelDetail}>
                                     <FontAwesome name="map-marker" size={16} color={COLORS.PRIMARY} />
-                                    {' ' + restaurant.distance}
+                                    {' ' + detailedRestaurant.distance}
                                 </Text>
                             )}
-                            {restaurant.duration && (
+                            {detailedRestaurant.duration && (
                                 <Text style={styles.travelDetail}>
                                     <FontAwesome name="clock-o" size={16} color={COLORS.PRIMARY} />
-                                    {' ' + restaurant.duration}
+                                    {' ' + detailedRestaurant.duration}
                                 </Text>
                             )}
                         </View>
                     </View>
+
+                    {isLoading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                            <Text style={styles.loadingText}>Loading details...</Text>
+                        </View>
+                    ) : (
+                        <>
+                            {renderBusinessHours()}
+
+                            {detailedRestaurant.phoneNumber && (
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>Contact</Text>
+                                    <TouchableOpacity onPress={callRestaurant}>
+                                        <Text style={styles.phoneNumber}>
+                                            <FontAwesome name="phone" size={16} color={COLORS.PRIMARY} />
+                                            {' ' + detailedRestaurant.phoneNumber}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </>
+                    )}
 
                     <TouchableOpacity
                         style={styles.shareButton}
@@ -189,11 +369,17 @@ const styles = StyleSheet.create({
     content: {
         padding: 20,
     },
+    nameContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
     name: {
         fontSize: 24,
         fontWeight: '700',
         color: COLORS.TEXT,
-        marginBottom: 8,
+        flex: 1, // Allow the name to take up most of the space
     },
     ratingRow: {
         flexDirection: 'row',
@@ -285,5 +471,81 @@ const styles = StyleSheet.create({
         color: COLORS.SURFACE,
         fontSize: 16,
         fontWeight: '600',
+    },
+    hoursContainer: {
+        marginBottom: 12,
+        borderRadius: 8,
+        backgroundColor: COLORS.SURFACE,
+        overflow: 'hidden',
+    },
+    hourRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.GRAY_LIGHT,
+    },
+    todayRow: {
+        backgroundColor: COLORS.PRIMARY_LIGHT,
+    },
+    dayText: {
+        fontSize: 16,
+        color: COLORS.TEXT,
+        fontWeight: '500',
+        width: '40%',
+    },
+    timeText: {
+        fontSize: 16,
+        color: COLORS.TEXT_SECONDARY,
+        width: '60%',
+        textAlign: 'right',
+    },
+    todayText: {
+        color: COLORS.PRIMARY,
+        fontWeight: '600',
+    },
+    phoneNumber: {
+        fontSize: 16,
+        color: COLORS.PRIMARY,
+        marginVertical: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        backgroundColor: COLORS.SURFACE,
+        borderRadius: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    loadingContainer: {
+        padding: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        fontSize: 16,
+        color: COLORS.TEXT_SECONDARY,
+        marginTop: 8,
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        marginLeft: 8,
+    },
+    openBadge: {
+        backgroundColor: 'rgba(39, 174, 96, 0.2)', // Light green background
+    },
+    closedBadge: {
+        backgroundColor: 'rgba(231, 76, 60, 0.2)', // Light red background
+    },
+    statusText: {
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    openText: {
+        color: '#27AE60', // Green text
+    },
+    closedText: {
+        color: '#E74C3C', // Red text
     },
 }); 
