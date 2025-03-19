@@ -458,7 +458,7 @@ export const findPracticalMidpoint = async (
 
         // Step 2: Search for venues with progressively larger radii until we find some
         let venues: any[] = [];
-        const searchRadii = [500, 1500, 3000, 5000, 10000, 15000]; // Increasing search radii in meters
+        const searchRadii = [500, 1500, 3000, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000]; // Increasing search radii in meters
 
         for (const radius of searchRadii) {
             console.log(`Searching for venues within ${radius}m of midpoint`);

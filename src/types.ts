@@ -26,6 +26,8 @@ export interface Restaurant {
     durationA?: string;
     distanceB?: string;
     durationB?: string;
+    phoneNumber?: string;
+    businessHours?: string[];
 }
 
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'bicycling';
