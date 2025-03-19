@@ -46,6 +46,17 @@ interface GooglePlacesAutocompleteResponse {
     status: string;
 }
 
+interface PlaceDetailsResponse {
+    result: {
+        formatted_phone_number?: string;
+        opening_hours?: {
+            weekday_text?: string[];
+        };
+        // ... other details available in the API
+    };
+    status: string;
+}
+
 export const searchRestaurants = async (
     location: Location,
     category: PlaceCategory
@@ -144,5 +155,29 @@ export const getPlacePredictions = async (input: string): Promise<PlacePredictio
     } catch (error) {
         console.error('Failed to get place predictions:', error);
         return [];
+    }
+};
+
+export const getPlaceDetails = async (placeId: string): Promise<{
+    phoneNumber?: string;
+    businessHours?: string[];
+}> => {
+    try {
+        const response = await axios.get<PlaceDetailsResponse>(
+            `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,opening_hours&key=${GOOGLE_MAPS_API_KEY}`
+        );
+
+        if (response.data.status !== 'OK') {
+            console.warn(`Failed to get place details for ${placeId}: ${response.data.status}`);
+            return {};
+        }
+
+        return {
+            phoneNumber: response.data.result.formatted_phone_number,
+            businessHours: response.data.result.opening_hours?.weekday_text,
+        };
+    } catch (error) {
+        console.error('Error fetching place details:', error);
+        return {};
     }
 }; 
