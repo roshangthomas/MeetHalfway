@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking } from 'react-native';
 import MapViewWrapper from './src/components/MapViewWrapper';
 import { Marker } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
@@ -9,7 +9,7 @@ import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces } from './src/services/location';
 import { searchRestaurants, getTravelInfo } from './src/services/places';
-import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
+import { Location as LocationType, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
 import { ERROR_MESSAGES } from './src/constants';
 import { CategoryPicker } from './src/components/CategoryPicker';
@@ -17,6 +17,7 @@ import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { ResultsScreen } from './src/screens/ResultsScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ExpoLocation from 'expo-location';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -25,26 +26,90 @@ type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 function HomeScreen({ navigation }: HomeScreenProps) {
   const [partnerAddress, setPartnerAddress] = useState('');
-  const [userLocation, setUserLocation] = useState<Location | null>(null);
+  const [userAddress, setUserAddress] = useState('');
+  const [userLocation, setUserLocation] = useState<LocationType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
   const [travelMode, setTravelMode] = useState<TravelMode>('driving');
   const [selectedCategories, setSelectedCategories] = useState<PlaceCategory[]>(['restaurant']);
   const [mapRegion, setMapRegion] = useState({
-    latitude: 37.94565601059843,
-    longitude: -121.98505722883536,
+    latitude: 37.7749,
+    longitude: -122.4194, // Default to San Francisco as initial view
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+  const [locationServicesEnabled, setLocationServicesEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Initialize with hardcoded location immediately
-    const location = {
-      latitude: 37.94565601059843,
-      longitude: -121.98505722883536,
+    // Check if location services are enabled when component mounts
+    const checkLocationServices = async () => {
+      const enabled = await ExpoLocation.hasServicesEnabledAsync();
+      setLocationServicesEnabled(enabled);
+
+      if (!enabled) {
+        // If location services are disabled, set the appropriate permission state
+        setLocationPermission('denied');
+      } else {
+        // Only request location if services are enabled
+        getUserLocation();
+      }
     };
-    setUserLocation(location);
+
+    checkLocationServices();
   }, []);
+
+  const getUserLocation = async () => {
+    setLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      setUserLocation(location);
+      setMapRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setLocationPermission('granted');
+      setError(null);
+    } catch (error) {
+      console.error('Failed to get user location:', error);
+      if (error instanceof Error &&
+        error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
+        setLocationPermission('denied');
+      }
+      setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUserAddressSubmit = async () => {
+    if (!userAddress.trim()) {
+      setError('Please enter your location');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const geocodedLocation = await geocodeAddress(userAddress);
+      setUserLocation(geocodedLocation);
+      setMapRegion({
+        latitude: geocodedLocation.latitude,
+        longitude: geocodedLocation.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setLocationPermission('granted');
+    } catch (error) {
+      console.error('Failed to geocode user address:', error);
+      setError(error instanceof Error ? error.message : ERROR_MESSAGES.GEOCODING_FAILED);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSearch = async () => {
     if (!userLocation) {
@@ -62,7 +127,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
     try {
       // Geocode partner address
-      let partnerLoc;
+      let partnerLoc: LocationType;
       try {
         partnerLoc = await geocodeAddress(partnerAddress);
       } catch (geocodeError) {
@@ -76,14 +141,14 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       }
 
       // Calculate midpoint based on road distance
-      let midpoint;
+      let midpoint: LocationType;
       try {
         // Use road-based midpoint calculation
-        midpoint = await calculateRoadMidpoint(userLocation, partnerLoc);
+        midpoint = await calculateRoadMidpoint(userLocation as LocationType, partnerLoc);
       } catch (midpointError) {
         console.warn('Road midpoint calculation failed, falling back to simple midpoint', midpointError);
         // Fallback to simple midpoint if road calculation fails
-        midpoint = calculateMidpoint(userLocation, partnerLoc);
+        midpoint = calculateMidpoint(userLocation as LocationType, partnerLoc);
       }
 
       // Update map region to show the midpoint
@@ -98,7 +163,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       let optimizedRestaurants;
       try {
         optimizedRestaurants = await findOptimalMeetingPlaces(
-          userLocation,
+          userLocation as LocationType,
           partnerLoc,
           travelMode,
           selectedCategories,
@@ -147,12 +212,12 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         // Add travel information for each restaurant
         const travelPromises = allRestaurants.map(async (restaurant) => {
           try {
-            const restaurantLocation = {
+            const restaurantLocation: LocationType = {
               latitude: restaurant.latitude,
               longitude: restaurant.longitude
             };
 
-            const travelInfo = await getTravelInfo(userLocation, restaurantLocation, travelMode);
+            const travelInfo = await getTravelInfo(userLocation as LocationType, restaurantLocation, travelMode);
             restaurant.distance = travelInfo.distance;
             restaurant.duration = travelInfo.duration;
             return restaurant;
@@ -178,7 +243,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       // Navigate to results screen with all necessary data
       navigation.navigate('Results', {
         restaurants: optimizedRestaurants,
-        userLocation,
+        userLocation: userLocation as LocationType,
         partnerLocation: partnerLoc,
         midpointLocation: midpoint,
         travelMode: travelMode,
@@ -199,6 +264,17 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     }
   };
 
+  // Function to open device settings
+  const openLocationSettings = () => {
+    // For iOS this opens the Settings app
+    // For Android this opens Location Settings
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
+    }
+  };
+
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
@@ -214,8 +290,8 @@ function HomeScreen({ navigation }: HomeScreenProps) {
                   {userLocation && (
                     <Marker
                       coordinate={{
-                        latitude: userLocation.latitude,
-                        longitude: userLocation.longitude,
+                        latitude: (userLocation as LocationType).latitude,
+                        longitude: (userLocation as LocationType).longitude,
                       }}
                       title="Your Location"
                     />
@@ -225,37 +301,92 @@ function HomeScreen({ navigation }: HomeScreenProps) {
             )}
 
             <View style={styles.inputContainer}>
-              <LocationInput
-                value={partnerAddress}
-                onChangeText={setPartnerAddress}
-                placeholder="Enter partner's location..."
-              />
+              {!userLocation && (
+                <>
+                  <Text style={styles.label}>Your Location:</Text>
+                  <LocationInput
+                    value={userAddress}
+                    onChangeText={setUserAddress}
+                    placeholder="Enter your location..."
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      (!userAddress || loading) && styles.buttonDisabled
+                    ]}
+                    onPress={handleUserAddressSubmit}
+                    disabled={loading || !userAddress}
+                  >
+                    <Text style={styles.buttonText}>
+                      Set My Location
+                    </Text>
+                  </TouchableOpacity>
 
-              <TravelModePicker
-                selectedMode={travelMode}
-                onModeChange={setTravelMode}
-              />
+                  {locationPermission === 'denied' && (
+                    <TouchableOpacity
+                      style={[styles.button, styles.warningButton]}
+                      onPress={openLocationSettings}
+                    >
+                      <Text style={styles.buttonText}>
+                        Enable Location Services
+                      </Text>
+                    </TouchableOpacity>
+                  )}
 
-              <CategoryPicker
-                selectedCategories={selectedCategories}
-                onCategoriesChange={setSelectedCategories}
-              />
+                  {locationPermission !== 'denied' && (
+                    <TouchableOpacity
+                      style={[styles.button, styles.secondaryButton]}
+                      onPress={getUserLocation}
+                    >
+                      <Text style={styles.secondaryButtonText}>
+                        Use My Current Location
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
 
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  (!partnerAddress || loading) && styles.buttonDisabled
-                ]}
-                onPress={handleSearch}
-                disabled={loading || !partnerAddress}
-              >
-                <Text style={styles.buttonText}>
-                  Find Meeting Point & Places
-                </Text>
-              </TouchableOpacity>
+              {userLocation && (
+                <>
+                  <Text style={styles.label}>Partner's Location:</Text>
+                  <LocationInput
+                    value={partnerAddress}
+                    onChangeText={setPartnerAddress}
+                    placeholder="Enter partner's location..."
+                  />
+
+                  <TravelModePicker
+                    selectedMode={travelMode}
+                    onModeChange={setTravelMode}
+                  />
+
+                  <CategoryPicker
+                    selectedCategories={selectedCategories}
+                    onCategoriesChange={setSelectedCategories}
+                  />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.button,
+                      (!partnerAddress || loading) && styles.buttonDisabled
+                    ]}
+                    onPress={handleSearch}
+                    disabled={loading || !partnerAddress}
+                  >
+                    <Text style={styles.buttonText}>
+                      Find Meeting Point & Places
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
 
-            {error && <Text style={styles.error}>{error}</Text>}
+            {/* Show either the general error or the location permission error */}
+            {(error || locationPermission === 'denied') && (
+              <Text style={styles.error}>
+                {error || ERROR_MESSAGES.LOCATION_PERMISSION_DENIED}
+              </Text>
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
