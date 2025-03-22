@@ -66,4 +66,26 @@ export const styles = StyleSheet.create({
     buttonDisabled: {
         opacity: 0.7,
     },
+    label: {
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 8,
+        color: COLORS.TEXT,
+    },
+    secondaryButton: {
+        backgroundColor: COLORS.SURFACE,
+        borderWidth: 1,
+        borderColor: COLORS.PRIMARY,
+        marginTop: 8,
+    },
+    secondaryButtonText: {
+        color: COLORS.PRIMARY,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    warningButton: {
+        backgroundColor: COLORS.WARNING,
+        marginTop: 8,
+        marginBottom: 8,
+    },
 }); 
