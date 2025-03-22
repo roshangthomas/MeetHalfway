@@ -150,7 +150,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.content}>
+            <View style={styles.content}>
                 {/* Filter and Sort Bar */}
                 <View style={styles.filterSortBar}>
                     <View style={styles.divider} />
@@ -198,7 +198,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                         </View>
                     )}
                 </View>
-            </ScrollView>
+            </View>
 
             <FilterModal
                 visible={isFilterModalVisible}
