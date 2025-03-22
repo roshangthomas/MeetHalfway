@@ -18,6 +18,7 @@ import { ResultsScreen } from './src/screens/ResultsScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
+import { NoResultsScreen } from './src/screens/NoResultsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -193,7 +194,10 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
         // If no restaurants found
         if (allRestaurants.length === 0) {
-          setError(`No places found near the midpoint. Try different categories or locations.`);
+          // Navigate to NoResults screen instead of just setting an error
+          navigation.navigate('NoResults', {
+            errorMessage: `No places found near the midpoint. Try different categories or locations.`
+          });
           setLoading(false);
           return;
         }
@@ -235,7 +239,10 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
       // If no restaurants found after all attempts
       if (!optimizedRestaurants || optimizedRestaurants.length === 0) {
-        setError(`No places found. Try different categories or locations.`);
+        // Navigate to NoResults screen
+        navigation.navigate('NoResults', {
+          errorMessage: `No places found. Try different categories or locations.`
+        });
         setLoading(false);
         return;
       }
@@ -252,13 +259,16 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     } catch (error) {
       console.error('Search error:', error);
 
+      let errorMessage = ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED;
       if (error instanceof Error) {
         // Use the specific error message if available
-        setError(error.message);
-      } else {
-        // Default error message
-        setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
+        errorMessage = error.message;
       }
+
+      // Navigate to NoResults screen for general errors too
+      navigation.navigate('NoResults', {
+        errorMessage
+      });
     } finally {
       setLoading(false);
     }
@@ -412,6 +422,11 @@ export default function App() {
           name="RestaurantDetail"
           component={RestaurantDetailScreen}
           options={({ route }) => ({ title: route.params.restaurant.name })}
+        />
+        <Stack.Screen
+          name="NoResults"
+          component={NoResultsScreen}
+          options={{ title: 'No Results', headerLeft: () => null }}
         />
       </Stack.Navigator>
     </NavigationContainer>
