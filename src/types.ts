@@ -61,6 +61,10 @@ export type RootStackParamList = {
     RestaurantDetail: {
         restaurant: Restaurant;
         userLocation: Location;
-        travelMode?: TravelMode;
+        partnerLocation: Location;
+        travelMode: TravelMode;
+    };
+    NoResults: {
+        errorMessage?: string;
     };
 }; 
