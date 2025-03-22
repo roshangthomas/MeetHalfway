@@ -19,7 +19,6 @@ export interface FilterOptions {
     minRating: number;
     minReviews: number;
     maxPrice: number; // 1-4
-    cuisineTypes: string[];
 }
 
 interface FilterModalProps {
@@ -27,7 +26,6 @@ interface FilterModalProps {
     onClose: () => void;
     onApply: (filters: FilterOptions) => void;
     initialFilters: FilterOptions;
-    availableCuisineTypes: string[];
 }
 
 export const FilterModal: React.FC<FilterModalProps> = ({
@@ -35,7 +33,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     onClose,
     onApply,
     initialFilters,
-    availableCuisineTypes
 }) => {
     const [filters, setFilters] = useState<FilterOptions>(initialFilters);
     const [tempRating, setTempRating] = useState(initialFilters.minRating);
@@ -57,24 +54,9 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             minRating: 0,
             minReviews: 0,
             maxPrice: 4,
-            cuisineTypes: []
         });
         setTempRating(0);
         setTempPrice(4);
-    };
-
-    const toggleCuisineType = (cuisineType: string) => {
-        if (filters.cuisineTypes.includes(cuisineType)) {
-            setFilters({
-                ...filters,
-                cuisineTypes: filters.cuisineTypes.filter(type => type !== cuisineType)
-            });
-        } else {
-            setFilters({
-                ...filters,
-                cuisineTypes: [...filters.cuisineTypes, cuisineType]
-            });
-        }
     };
 
     const renderStars = (count: number) => {
@@ -272,33 +254,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                     </View>
                                 </View>
 
-                                {/* Cuisine Types Filter */}
-                                {availableCuisineTypes.length > 0 && (
-                                    <View style={styles.filterSection}>
-                                        <Text style={styles.filterTitle}>Cuisine Types</Text>
-                                        <View style={styles.cuisineContainer}>
-                                            {availableCuisineTypes.map((cuisine) => (
-                                                <TouchableOpacity
-                                                    key={cuisine}
-                                                    style={[
-                                                        styles.cuisineTag,
-                                                        filters.cuisineTypes.includes(cuisine) && styles.cuisineTagSelected
-                                                    ]}
-                                                    onPress={() => toggleCuisineType(cuisine)}
-                                                >
-                                                    <Text
-                                                        style={[
-                                                            styles.cuisineText,
-                                                            filters.cuisineTypes.includes(cuisine) && styles.cuisineTextSelected
-                                                        ]}
-                                                    >
-                                                        {cuisine.replace(/_/g, ' ')}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    </View>
-                                )}
                             </ScrollView>
 
                             <View style={styles.buttonContainer}>
@@ -416,30 +371,6 @@ const styles = StyleSheet.create({
     inputLabel: {
         fontSize: 16,
         color: COLORS.TEXT_SECONDARY,
-    },
-    cuisineContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-    },
-    cuisineTag: {
-        backgroundColor: COLORS.GRAY_LIGHT,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 20,
-        marginBottom: 8,
-    },
-    cuisineTagSelected: {
-        backgroundColor: COLORS.PRIMARY_LIGHT,
-    },
-    cuisineText: {
-        fontSize: 14,
-        color: COLORS.TEXT,
-        textTransform: 'capitalize',
-    },
-    cuisineTextSelected: {
-        color: COLORS.PRIMARY,
-        fontWeight: '600',
     },
     buttonContainer: {
         flexDirection: 'row',
