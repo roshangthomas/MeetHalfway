@@ -71,13 +71,13 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        marginBottom: 16,
+        marginBottom: 10,
     },
     headerContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'baseline',
-        marginBottom: 12,
+        marginBottom: 8,
         marginHorizontal: 4,
     },
     label: {
@@ -93,18 +93,18 @@ const styles = StyleSheet.create({
     categoryGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginHorizontal: -4,
+        marginHorizontal: -2,
     },
     categoryButton: {
         width: '50%',
-        paddingHorizontal: 4,
-        paddingVertical: 4,
+        paddingHorizontal: 2,
+        paddingVertical: 2,
     },
     categoryButtonInner: {
         backgroundColor: COLORS.SURFACE,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 6,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
         shadowColor: COLORS.TEXT,

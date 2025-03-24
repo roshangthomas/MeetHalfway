@@ -52,7 +52,8 @@ const RestaurantCard: React.FC<{
             navigation.navigate('RestaurantDetail', {
                 restaurant,
                 userLocation,
-                travelMode
+                partnerLocation: partnerLocation || userLocation,
+                travelMode: travelMode || 'driving'
             });
         };
 
