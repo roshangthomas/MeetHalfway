@@ -12,7 +12,7 @@ import { getPlacePredictions } from '../services/places';
 import { COLORS } from '../constants/colors';
 
 interface LocationInputProps {
-    value: string;
+    value: string | null;
     onChangeText: (text: string) => void;
     placeholder: string;
 }
@@ -27,7 +27,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
 
     useEffect(() => {
         const fetchPredictions = async () => {
-            if (value.length > 2) {
+            if (value && value.length > 2) {
                 const results = await getPlacePredictions(value);
                 setPredictions(results.slice(0, 5)); // Limit to 5 results
                 setShowPredictions(true);
@@ -54,7 +54,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
             <View style={styles.inputWrapper}>
                 <TextInput
                     style={styles.input}
-                    value={value}
+                    value={value || ''}
                     onChangeText={onChangeText}
                     placeholder={placeholder}
                     placeholderTextColor={COLORS.TEXT_SECONDARY}
