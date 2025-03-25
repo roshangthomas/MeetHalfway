@@ -24,8 +24,26 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         minRating: 0,
         minReviews: 0,
         maxPrice: 4,
-        cuisineTypes: []
     });
+
+    // Helper function to convert duration strings like "15 mins" to minutes
+    const convertDurationToMinutes = (duration: string): number => {
+        if (!duration || duration === 'Unknown') return 0;
+
+        // Extract numbers from the duration text
+        const matches = duration.match(/(\d+)/g);
+        if (!matches) return 0;
+
+        if (duration.includes('hour') || duration.includes('hr')) {
+            // Handle hours and minutes format (e.g., "1 hour 20 mins")
+            const hours = parseInt(matches[0], 10) || 0;
+            const minutes = matches.length > 1 ? parseInt(matches[1], 10) : 0;
+            return (hours * 60) + minutes;
+        } else {
+            // Handle minutes only format (e.g., "20 mins")
+            return parseInt(matches[0], 10) || 0;
+        }
+    };
 
     // Load fonts
     useEffect(() => {
@@ -39,17 +57,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         }
         loadFonts();
     }, []);
-
-    // Extract all unique cuisine types from restaurants
-    const availableCuisineTypes = useMemo(() => {
-        const cuisineSet = new Set<string>();
-        restaurants.forEach(restaurant => {
-            if (restaurant.types) {
-                restaurant.types.forEach(type => cuisineSet.add(type));
-            }
-        });
-        return Array.from(cuisineSet);
-    }, [restaurants]);
 
     const sortedAndFilteredRestaurants = useMemo(() => {
         // First apply filters
@@ -66,12 +73,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
 
             // Filter by price level
             if (restaurant.priceLevel && restaurant.priceLevel > filters.maxPrice) {
-                return false;
-            }
-
-            // Filter by cuisine types
-            if (filters.cuisineTypes.length > 0 &&
-                (!restaurant.types || !restaurant.types.some(type => filters.cuisineTypes.includes(type)))) {
                 return false;
             }
 
@@ -106,12 +107,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         });
     }, [restaurants, sortOption, filters]);
 
-    // Helper function to convert duration strings like "15 mins" to minutes
-    const convertDurationToMinutes = (duration: string): number => {
-        const match = duration.match(/(\d+)/);
-        return match ? parseInt(match[1], 10) : 0;
-    };
-
     const handleApplyFilters = (newFilters: FilterOptions) => {
         setFilters(newFilters);
         setIsFilterModalVisible(false);
@@ -128,7 +123,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         if (filters.minRating > 0) count++;
         if (filters.minReviews > 0) count++;
         if (filters.maxPrice < 4) count++;
-        if (filters.cuisineTypes.length > 0) count++;
         return count;
     };
 
@@ -205,7 +199,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 onClose={() => setIsFilterModalVisible(false)}
                 onApply={handleApplyFilters}
                 initialFilters={filters}
-                availableCuisineTypes={availableCuisineTypes}
             />
 
             <SortModal
