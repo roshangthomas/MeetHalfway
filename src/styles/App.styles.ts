@@ -170,4 +170,10 @@ export const styles = StyleSheet.create({
         fontWeight: '500',
         marginLeft: 2,
     },
+    keyboardAvoidingContainer: {
+        flex: 1,
+    },
+    scrollViewContent: {
+        flexGrow: 1,
+    },
 }); 

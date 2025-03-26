@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager } from 'react-native';
 import MapViewWrapper from './src/components/MapViewWrapper';
 import { Marker, Region } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
@@ -53,6 +53,10 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
   const [selectedCategories, setSelectedCategories] = useState<PlaceCategory[]>(['restaurant']);
   const [mapRegion, setMapRegion] = useState<Region | null>(null);
   const [locationServicesEnabled, setLocationServicesEnabled] = useState<boolean | null>(null);
+
+  // Add ScrollView ref
+  const scrollViewRef = useRef<ScrollView>(null);
+  const partnerLocationInputRef = useRef<View>(null);
 
   // Check for new location passed from ChangeLocation screen
   useEffect(() => {
@@ -294,94 +298,123 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
     }
   };
 
+  // Function to handle partner location input focus
+  const handlePartnerLocationFocus = () => {
+    // Add a small delay to ensure the keyboard is showing
+    setTimeout(() => {
+      if (partnerLocationInputRef.current && scrollViewRef.current) {
+        // Find the position of the partner location input and scroll to it
+        partnerLocationInputRef.current.measureInWindow((x, y, width, height) => {
+          // Scroll to the position plus some extra space for the dropdown
+          const yOffset = y + 150; // Adding extra space for dropdown
+          scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+        });
+      }
+    }, 300);
+  };
+
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
         <LoadingOverlay visible={loading} />
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            {userLocation && (
-              <View style={styles.mapContainer}>
-                <MapViewWrapper
-                  style={styles.map}
-                  region={mapRegion || undefined}
-                >
-                  {userLocation && (
-                    <Marker
-                      coordinate={{
-                        latitude: (userLocation as LocationType).latitude,
-                        longitude: (userLocation as LocationType).longitude,
-                      }}
-                      title="Your Location"
-                    />
-                  )}
-                </MapViewWrapper>
-              </View>
-            )}
-
-            <View style={styles.inputContainer}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            <View style={styles.content}>
               {userLocation && (
-                <>
-                  <View style={styles.userLocationContainer}>
-                    <Text style={styles.label}>Your Location:</Text>
-                    <View style={styles.locationInfoContainer}>
-                      <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
-                        {formatAddressForDisplay(userAddress || "Current Location")}
-                      </Text>
+                <View style={styles.mapContainer}>
+                  <MapViewWrapper
+                    style={styles.map}
+                    region={mapRegion || undefined}
+                  >
+                    {userLocation && (
+                      <Marker
+                        coordinate={{
+                          latitude: (userLocation as LocationType).latitude,
+                          longitude: (userLocation as LocationType).longitude,
+                        }}
+                        title="Your Location"
+                      />
+                    )}
+                  </MapViewWrapper>
+                </View>
+              )}
+
+              <View style={styles.inputContainer}>
+                {userLocation && (
+                  <>
+                    <View style={styles.userLocationContainer}>
+                      <Text style={styles.label}>Your Location:</Text>
+                      <View style={styles.locationInfoContainer}>
+                        <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+                          {formatAddressForDisplay(userAddress || "Current Location")}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.button, styles.secondaryButton, styles.changeLocationButton]}
+                          onPress={handleChangeLocation}
+                        >
+                          <Text style={styles.secondaryButtonText}>
+                            Change
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <Text style={styles.label}>Partner's Location:</Text>
+                    <View ref={partnerLocationInputRef}>
+                      <LocationInput
+                        value={partnerAddress || ''}
+                        onChangeText={setPartnerAddress}
+                        placeholder="Enter partner's location..."
+                        onInputFocus={handlePartnerLocationFocus}
+                      />
+                    </View>
+
+                    <TravelModePicker
+                      selectedMode={travelMode}
+                      onModeChange={setTravelMode}
+                    />
+
+                    <CategoryPicker
+                      selectedCategories={selectedCategories}
+                      onCategoriesChange={setSelectedCategories}
+                    />
+
+                    <View style={styles.findButtonContainer}>
                       <TouchableOpacity
-                        style={[styles.button, styles.secondaryButton, styles.changeLocationButton]}
-                        onPress={handleChangeLocation}
+                        style={[
+                          styles.findButton,
+                          (!partnerAddress || loading) && styles.buttonDisabled
+                        ]}
+                        onPress={handleSearch}
+                        disabled={loading || !partnerAddress}
                       >
-                        <Text style={styles.secondaryButtonText}>
-                          Change
+                        <Text style={styles.findButtonText}>
+                          Find Meeting Point & Places
                         </Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
+                  </>
+                )}
+              </View>
 
-                  <Text style={styles.label}>Partner's Location:</Text>
-                  <LocationInput
-                    value={partnerAddress || ''}
-                    onChangeText={setPartnerAddress}
-                    placeholder="Enter partner's location..."
-                  />
-
-                  <TravelModePicker
-                    selectedMode={travelMode}
-                    onModeChange={setTravelMode}
-                  />
-
-                  <CategoryPicker
-                    selectedCategories={selectedCategories}
-                    onCategoriesChange={setSelectedCategories}
-                  />
-
-                  <View style={styles.findButtonContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.findButton,
-                        (!partnerAddress || loading) && styles.buttonDisabled
-                      ]}
-                      onPress={handleSearch}
-                      disabled={loading || !partnerAddress}
-                    >
-                      <Text style={styles.findButtonText}>
-                        Find Meeting Point & Places
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
+              {/* Show either the general error or the location permission error */}
+              {(error || locationPermission === 'denied') && (
+                <Text style={styles.error}>
+                  {error || ERROR_MESSAGES.LOCATION_PERMISSION_DENIED}
+                </Text>
               )}
             </View>
-
-            {/* Show either the general error or the location permission error */}
-            {(error || locationPermission === 'denied') && (
-              <Text style={styles.error}>
-                {error || ERROR_MESSAGES.LOCATION_PERMISSION_DENIED}
-              </Text>
-            )}
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ErrorBoundary>
   );
@@ -398,6 +431,10 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
   const [locationServicesEnabled, setLocationServicesEnabled] = useState<boolean | null>(null);
 
+  // Add ScrollView ref
+  const scrollViewRef = useRef<ScrollView>(null);
+  const locationInputRef = useRef<View>(null);
+
   useEffect(() => {
     // Check if location services are enabled when component mounts
     const checkLocationServices = async () => {
@@ -412,6 +449,21 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
 
     checkLocationServices();
   }, []);
+
+  // Function to handle location input focus
+  const handleLocationFocus = () => {
+    // Add a small delay to ensure the keyboard is showing
+    setTimeout(() => {
+      if (locationInputRef.current && scrollViewRef.current) {
+        // Find the position of the location input and scroll to it
+        locationInputRef.current.measureInWindow((x, y, width, height) => {
+          // Scroll to the position plus some extra space for the dropdown
+          const yOffset = y + 150; // Adding extra space for dropdown
+          scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+        });
+      }
+    }, 300);
+  };
 
   const getUserLocation = async () => {
     setLoading(true);
@@ -481,59 +533,73 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
         <LoadingOverlay visible={loading} />
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Your Location:</Text>
-              <LocationInput
-                value={userAddress}
-                onChangeText={setUserAddress}
-                placeholder="Enter your location..."
-              />
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  (!userAddress || loading) && styles.buttonDisabled
-                ]}
-                onPress={handleUserAddressSubmit}
-                disabled={loading || !userAddress}
-              >
-                <Text style={styles.buttonText}>
-                  Set My Location
-                </Text>
-              </TouchableOpacity>
-
-              {locationPermission === 'denied' && (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            <View style={styles.content}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Your Location:</Text>
+                <View ref={locationInputRef}>
+                  <LocationInput
+                    value={userAddress}
+                    onChangeText={setUserAddress}
+                    placeholder="Enter your location..."
+                    onInputFocus={handleLocationFocus}
+                  />
+                </View>
                 <TouchableOpacity
-                  style={[styles.button, styles.warningButton]}
-                  onPress={openLocationSettings}
+                  style={[
+                    styles.button,
+                    (!userAddress || loading) && styles.buttonDisabled
+                  ]}
+                  onPress={handleUserAddressSubmit}
+                  disabled={loading || !userAddress}
                 >
                   <Text style={styles.buttonText}>
-                    Enable Location Services
+                    Set My Location
                   </Text>
                 </TouchableOpacity>
-              )}
 
-              {locationPermission !== 'denied' && (
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={getUserLocation}
-                >
-                  <Text style={styles.secondaryButtonText}>
-                    Use My Current Location
-                  </Text>
-                </TouchableOpacity>
+                {locationPermission === 'denied' && (
+                  <TouchableOpacity
+                    style={[styles.button, styles.warningButton]}
+                    onPress={openLocationSettings}
+                  >
+                    <Text style={styles.buttonText}>
+                      Enable Location Services
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {locationPermission !== 'denied' && (
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={getUserLocation}
+                  >
+                    <Text style={styles.secondaryButtonText}>
+                      Use My Current Location
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Show error message if any */}
+              {error && (
+                <Text style={styles.error}>
+                  {error}
+                </Text>
               )}
             </View>
-
-            {/* Show error message if any */}
-            {error && (
-              <Text style={styles.error}>
-                {error}
-              </Text>
-            )}
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ErrorBoundary>
   );
