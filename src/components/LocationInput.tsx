@@ -42,24 +42,33 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, maxHeight: 200 });
     const inputRef = useRef<TextInput>(null);
 
-    useEffect(() => {
-        const fetchPredictions = async () => {
-            if (value && value.length > 2) {
-                const results = await getPlacePredictions(value);
-                setPredictions(results.slice(0, 5)); // Limit to 5 results
-                setShowPredictions(true);
-            } else {
-                setPredictions([]);
-                setShowPredictions(false);
-            }
-        };
+    // Add ref to track selection state that persists across re-renders
+    const selectionMadeRef = useRef(false);
 
-        const debounceTimeout = setTimeout(fetchPredictions, 300);
-        return () => clearTimeout(debounceTimeout);
+    useEffect(() => {
+        // Only fetch predictions if no selection was just made
+        if (!selectionMadeRef.current) {
+            const fetchPredictions = async () => {
+                if (value && value.length > 2) {
+                    const results = await getPlacePredictions(value);
+                    setPredictions(results.slice(0, 5)); // Limit to 5 results
+                    setShowPredictions(true);
+                } else {
+                    setPredictions([]);
+                    setShowPredictions(false);
+                }
+            };
+
+            const debounceTimeout = setTimeout(fetchPredictions, 300);
+            return () => clearTimeout(debounceTimeout);
+        } else {
+            // Reset the selection flag after handling the value change
+            selectionMadeRef.current = false;
+        }
     }, [value]);
 
     useEffect(() => {
-        if (value) {
+        if (value && !selectionMadeRef.current) {
             setSuggestions(predictions.map(p => ({ id: p.place_id, description: p.description })));
         } else {
             setSuggestions([]);
@@ -94,16 +103,34 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         };
     }, []);
 
-    const handleSelectPrediction = (prediction: string) => {
-        onChangeText(prediction);
+    const clearAllDropdowns = () => {
+        // Mark that a selection was made to prevent re-showing suggestions
+        selectionMadeRef.current = true;
+
+        // Clear all dropdown-related states
         setShowPredictions(false);
+        setPredictions([]);
+        setSuggestions([]);
+        setIsFocused(false);
+
+        // Dismiss keyboard
         Keyboard.dismiss();
     };
 
+    const handleSelectPrediction = (prediction: string) => {
+        // Update the text field first
+        onChangeText(prediction);
+
+        // Then clear all dropdowns and dismiss keyboard
+        clearAllDropdowns();
+    };
+
     const handleSelectSuggestion = (suggestion: Suggestion) => {
+        // Update the text field first
         onChangeText(suggestion.description);
-        setSuggestions([]);
-        Keyboard.dismiss();
+
+        // Then clear all dropdowns and dismiss keyboard
+        clearAllDropdowns();
     };
 
     const handleFocus = () => {
@@ -120,17 +147,27 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                     ref={inputRef}
                     style={styles.input}
                     value={value || ''}
-                    onChangeText={onChangeText}
+                    onChangeText={(text) => {
+                        // Reset selection flag when user types
+                        selectionMadeRef.current = false;
+                        onChangeText(text);
+                    }}
                     placeholder={placeholder}
                     placeholderTextColor={COLORS.TEXT_SECONDARY}
                     onFocus={handleFocus}
                     onBlur={() => {
-                        setTimeout(() => setIsFocused(false), 200);
+                        setTimeout(() => {
+                            // Only clear focus state if no selection was made
+                            if (!selectionMadeRef.current) {
+                                setIsFocused(false);
+                                setShowPredictions(false);
+                            }
+                        }, 100);
                     }}
                 />
             </View>
 
-            {showPredictions && predictions.length > 0 && (
+            {showPredictions && predictions.length > 0 && !selectionMadeRef.current && (
                 <View style={styles.predictionsContainer}>
                     <ScrollView
                         keyboardShouldPersistTaps="always"
@@ -153,7 +190,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                 </View>
             )}
 
-            {isFocused && suggestions.length > 0 && (
+            {isFocused && suggestions.length > 0 && !selectionMadeRef.current && (
                 <View
                     style={[
                         styles.suggestionsContainer,
