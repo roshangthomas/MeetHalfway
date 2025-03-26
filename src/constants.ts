@@ -8,4 +8,5 @@ export const ERROR_MESSAGES = {
     GEOCODING_FAILED: 'Failed to convert address to coordinates. Please enter a valid address.',
     DIRECTIONS_FAILED: 'Failed to calculate directions. Please try a different location or travel mode.',
     ROUTE_NOT_FOUND: 'No route found between locations. Please try a different location or travel mode.',
+    LOCATION_PERMISSION_DENIED: 'Location permission was denied. Please enable location services to use this feature or set your location manually.',
 }; 

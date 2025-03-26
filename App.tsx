@@ -1,50 +1,129 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager } from 'react-native';
 import MapViewWrapper from './src/components/MapViewWrapper';
-import { Marker } from 'react-native-maps';
+import { Marker, Region } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces } from './src/services/location';
 import { searchRestaurants, getTravelInfo } from './src/services/places';
-import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
+import { Location as LocationType, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
 import { ERROR_MESSAGES } from './src/constants';
+import { COLORS } from './src/constants/colors';
 import { CategoryPicker } from './src/components/CategoryPicker';
 import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { ResultsScreen } from './src/screens/ResultsScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ExpoLocation from 'expo-location';
+import { NoResultsScreen } from './src/screens/NoResultsScreen';
+import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 // Define props type for HomeScreen
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-function HomeScreen({ navigation }: HomeScreenProps) {
-  const [partnerAddress, setPartnerAddress] = useState('');
-  const [userLocation, setUserLocation] = useState<Location | null>(null);
+function formatAddressForDisplay(address: string | null): string {
+  if (!address) return 'Current Location';
+
+  // Try to extract city, state, country
+  const parts = address.split(',').map(part => part.trim());
+
+  // If address has at least 3 parts, return the last 3 (city, state, country)
+  if (parts.length >= 3) {
+    return parts.slice(Math.max(0, parts.length - 3)).join(', ');
+  }
+
+  // If address is too short, return as is
+  return address;
+}
+
+function HomeScreen({ navigation, route }: HomeScreenProps) {
+  const [partnerAddress, setPartnerAddress] = useState<string | null>(null);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<LocationType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
   const [travelMode, setTravelMode] = useState<TravelMode>('driving');
   const [selectedCategories, setSelectedCategories] = useState<PlaceCategory[]>(['restaurant']);
-  const [mapRegion, setMapRegion] = useState({
-    latitude: 37.94565601059843,
-    longitude: -121.98505722883536,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  });
+  const [mapRegion, setMapRegion] = useState<Region | null>(null);
+  const [locationServicesEnabled, setLocationServicesEnabled] = useState<boolean | null>(null);
+
+  // Add ScrollView ref
+  const scrollViewRef = useRef<ScrollView>(null);
+  const partnerLocationInputRef = useRef<View>(null);
+
+  // Check for new location passed from ChangeLocation screen
+  useEffect(() => {
+    if (route.params?.newLocation && route.params?.newAddress) {
+      setUserLocation(route.params.newLocation);
+      setUserAddress(route.params.newAddress);
+      setMapRegion({
+        latitude: route.params.newLocation.latitude,
+        longitude: route.params.newLocation.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+
+      // Clear the parameters to avoid reapplying on subsequent renders
+      navigation.setParams({ newLocation: undefined, newAddress: undefined });
+    }
+  }, [route.params?.newLocation, route.params?.newAddress, navigation]);
 
   useEffect(() => {
-    // Initialize with hardcoded location immediately
-    const location = {
-      latitude: 37.94565601059843,
-      longitude: -121.98505722883536,
+    // Check if location services are enabled when component mounts
+    const checkLocationServices = async () => {
+      const enabled = await ExpoLocation.hasServicesEnabledAsync();
+      setLocationServicesEnabled(enabled);
+
+      if (!enabled) {
+        // If location services are disabled, set the appropriate permission state
+        setLocationPermission('denied');
+      } else {
+        // Only request location if services are enabled
+        getUserLocation();
+      }
     };
-    setUserLocation(location);
+
+    checkLocationServices();
   }, []);
+
+  const getUserLocation = async () => {
+    setLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      setUserLocation(location);
+      setMapRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setLocationPermission('granted');
+      setError(null);
+    } catch (error) {
+      console.error('Failed to get user location:', error);
+      if (error instanceof Error &&
+        error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
+        setLocationPermission('denied');
+      }
+      setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeLocation = () => {
+    navigation.navigate('ChangeLocation', {
+      previousLocation: userLocation,
+      previousAddress: userAddress || ''
+    });
+  };
 
   const handleSearch = async () => {
     if (!userLocation) {
@@ -52,7 +131,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       return;
     }
 
-    if (!partnerAddress.trim()) {
+    if (!partnerAddress || !partnerAddress.trim()) {
       setError(ERROR_MESSAGES.PARTNER_LOCATION_INVALID);
       return;
     }
@@ -62,7 +141,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
     try {
       // Geocode partner address
-      let partnerLoc;
+      let partnerLoc: LocationType;
       try {
         partnerLoc = await geocodeAddress(partnerAddress);
       } catch (geocodeError) {
@@ -76,14 +155,14 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       }
 
       // Calculate midpoint based on road distance
-      let midpoint;
+      let midpoint: LocationType;
       try {
         // Use road-based midpoint calculation
-        midpoint = await calculateRoadMidpoint(userLocation, partnerLoc);
+        midpoint = await calculateRoadMidpoint(userLocation as LocationType, partnerLoc);
       } catch (midpointError) {
         console.warn('Road midpoint calculation failed, falling back to simple midpoint', midpointError);
         // Fallback to simple midpoint if road calculation fails
-        midpoint = calculateMidpoint(userLocation, partnerLoc);
+        midpoint = calculateMidpoint(userLocation as LocationType, partnerLoc);
       }
 
       // Update map region to show the midpoint
@@ -98,7 +177,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       let optimizedRestaurants;
       try {
         optimizedRestaurants = await findOptimalMeetingPlaces(
-          userLocation,
+          userLocation as LocationType,
           partnerLoc,
           travelMode,
           selectedCategories,
@@ -128,7 +207,10 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
         // If no restaurants found
         if (allRestaurants.length === 0) {
-          setError(`No places found near the midpoint. Try different categories or locations.`);
+          // Navigate to NoResults screen instead of just setting an error
+          navigation.navigate('NoResults', {
+            errorMessage: `No places found near the midpoint. Try different categories or locations.`
+          });
           setLoading(false);
           return;
         }
@@ -147,12 +229,12 @@ function HomeScreen({ navigation }: HomeScreenProps) {
         // Add travel information for each restaurant
         const travelPromises = allRestaurants.map(async (restaurant) => {
           try {
-            const restaurantLocation = {
+            const restaurantLocation: LocationType = {
               latitude: restaurant.latitude,
               longitude: restaurant.longitude
             };
 
-            const travelInfo = await getTravelInfo(userLocation, restaurantLocation, travelMode);
+            const travelInfo = await getTravelInfo(userLocation as LocationType, restaurantLocation, travelMode);
             restaurant.distance = travelInfo.distance;
             restaurant.duration = travelInfo.duration;
             return restaurant;
@@ -170,7 +252,10 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 
       // If no restaurants found after all attempts
       if (!optimizedRestaurants || optimizedRestaurants.length === 0) {
-        setError(`No places found. Try different categories or locations.`);
+        // Navigate to NoResults screen
+        navigation.navigate('NoResults', {
+          errorMessage: `No places found. Try different categories or locations.`
+        });
         setLoading(false);
         return;
       }
@@ -178,7 +263,7 @@ function HomeScreen({ navigation }: HomeScreenProps) {
       // Navigate to results screen with all necessary data
       navigation.navigate('Results', {
         restaurants: optimizedRestaurants,
-        userLocation,
+        userLocation: userLocation as LocationType,
         partnerLocation: partnerLoc,
         midpointLocation: midpoint,
         travelMode: travelMode,
@@ -187,15 +272,260 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     } catch (error) {
       console.error('Search error:', error);
 
+      let errorMessage = ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED;
       if (error instanceof Error) {
         // Use the specific error message if available
-        setError(error.message);
-      } else {
-        // Default error message
-        setError(ERROR_MESSAGES.RESTAURANT_SEARCH_FAILED);
+        errorMessage = error.message;
       }
+
+      // Navigate to NoResults screen for general errors too
+      navigation.navigate('NoResults', {
+        errorMessage
+      });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to open device settings
+  const openLocationSettings = () => {
+    // For iOS this opens the Settings app
+    // For Android this opens Location Settings
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
+    }
+  };
+
+  // Function to handle partner location input focus
+  const handlePartnerLocationFocus = () => {
+    // Add a small delay to ensure the keyboard is showing
+    setTimeout(() => {
+      if (partnerLocationInputRef.current && scrollViewRef.current) {
+        // Find the position of the partner location input and scroll to it
+        partnerLocationInputRef.current.measureInWindow((x, y, width, height) => {
+          // Scroll to the position plus some extra space for the dropdown
+          const yOffset = y + 150; // Adding extra space for dropdown
+          scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+        });
+      }
+    }, 300);
+  };
+
+  return (
+    <ErrorBoundary>
+      <SafeAreaView style={styles.container}>
+        <LoadingOverlay visible={loading} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            <View style={styles.content}>
+              {userLocation && (
+                <View style={styles.mapContainer}>
+                  <MapViewWrapper
+                    style={styles.map}
+                    region={mapRegion || undefined}
+                  >
+                    {userLocation && (
+                      <Marker
+                        coordinate={{
+                          latitude: (userLocation as LocationType).latitude,
+                          longitude: (userLocation as LocationType).longitude,
+                        }}
+                        title="Your Location"
+                      />
+                    )}
+                  </MapViewWrapper>
+                </View>
+              )}
+
+              <View style={styles.inputContainer}>
+                {userLocation && (
+                  <>
+                    <View style={styles.userLocationContainer}>
+                      <Text style={styles.label}>Your Location:</Text>
+                      <View style={styles.locationInfoContainer}>
+                        <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+                          {formatAddressForDisplay(userAddress || "Current Location")}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.button, styles.secondaryButton, styles.changeLocationButton]}
+                          onPress={handleChangeLocation}
+                        >
+                          <Text style={styles.secondaryButtonText}>
+                            Change
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    <Text style={styles.label}>Partner's Location:</Text>
+                    <View ref={partnerLocationInputRef}>
+                      <LocationInput
+                        value={partnerAddress || ''}
+                        onChangeText={setPartnerAddress}
+                        placeholder="Enter partner's location..."
+                        onInputFocus={handlePartnerLocationFocus}
+                      />
+                    </View>
+
+                    <TravelModePicker
+                      selectedMode={travelMode}
+                      onModeChange={setTravelMode}
+                    />
+
+                    <CategoryPicker
+                      selectedCategories={selectedCategories}
+                      onCategoriesChange={setSelectedCategories}
+                    />
+
+                    <View style={styles.findButtonContainer}>
+                      <TouchableOpacity
+                        style={[
+                          styles.findButton,
+                          (!partnerAddress || loading) && styles.buttonDisabled
+                        ]}
+                        onPress={handleSearch}
+                        disabled={loading || !partnerAddress}
+                      >
+                        <Text style={styles.findButtonText}>
+                          Find Meeting Point & Places
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* Show either the general error or the location permission error */}
+              {(error || locationPermission === 'denied') && (
+                <Text style={styles.error}>
+                  {error || ERROR_MESSAGES.LOCATION_PERMISSION_DENIED}
+                </Text>
+              )}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </ErrorBoundary>
+  );
+}
+
+// Define props type for ChangeLocationScreen
+type ChangeLocationScreenProps = NativeStackScreenProps<RootStackParamList, 'ChangeLocation'>;
+
+function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) {
+  const [userAddress, setUserAddress] = useState('');
+  const [userLocation, setUserLocation] = useState<LocationType | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
+  const [locationServicesEnabled, setLocationServicesEnabled] = useState<boolean | null>(null);
+
+  // Add ScrollView ref
+  const scrollViewRef = useRef<ScrollView>(null);
+  const locationInputRef = useRef<View>(null);
+
+  useEffect(() => {
+    // Check if location services are enabled when component mounts
+    const checkLocationServices = async () => {
+      const enabled = await ExpoLocation.hasServicesEnabledAsync();
+      setLocationServicesEnabled(enabled);
+
+      if (!enabled) {
+        // If location services are disabled, set the appropriate permission state
+        setLocationPermission('denied');
+      }
+    };
+
+    checkLocationServices();
+  }, []);
+
+  // Function to handle location input focus
+  const handleLocationFocus = () => {
+    // Add a small delay to ensure the keyboard is showing
+    setTimeout(() => {
+      if (locationInputRef.current && scrollViewRef.current) {
+        // Find the position of the location input and scroll to it
+        locationInputRef.current.measureInWindow((x, y, width, height) => {
+          // Scroll to the position plus some extra space for the dropdown
+          const yOffset = y + 150; // Adding extra space for dropdown
+          scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
+        });
+      }
+    }, 300);
+  };
+
+  const getUserLocation = async () => {
+    setLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      setUserLocation(location);
+      setLocationPermission('granted');
+      setError(null);
+
+      // Auto-navigate back to home screen with new location
+      navigation.navigate('Home', {
+        newLocation: location,
+        newAddress: "Current Location"
+      });
+
+    } catch (error) {
+      console.error('Failed to get user location:', error);
+      if (error instanceof Error &&
+        error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
+        setLocationPermission('denied');
+      }
+      setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUserAddressSubmit = async () => {
+    if (!userAddress.trim()) {
+      setError('Please enter your location');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const geocodedLocation = await geocodeAddress(userAddress);
+      setUserLocation(geocodedLocation);
+
+      // Navigate back to home screen with new location
+      navigation.navigate('Home', {
+        newLocation: geocodedLocation,
+        newAddress: userAddress
+      });
+
+    } catch (error) {
+      console.error('Failed to geocode user address:', error);
+      setError(error instanceof Error ? error.message : ERROR_MESSAGES.GEOCODING_FAILED);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to open device settings
+  const openLocationSettings = () => {
+    // For iOS this opens the Settings app
+    // For Android this opens Location Settings
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
     }
   };
 
@@ -203,61 +533,73 @@ function HomeScreen({ navigation }: HomeScreenProps) {
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
         <LoadingOverlay visible={loading} />
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            {userLocation && (
-              <View style={styles.mapContainer}>
-                <MapViewWrapper
-                  style={styles.map}
-                  region={mapRegion}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardAvoidingContainer}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+        >
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollViewContent}
+          >
+            <View style={styles.content}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.label}>Your Location:</Text>
+                <View ref={locationInputRef}>
+                  <LocationInput
+                    value={userAddress}
+                    onChangeText={setUserAddress}
+                    placeholder="Enter your location..."
+                    onInputFocus={handleLocationFocus}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    (!userAddress || loading) && styles.buttonDisabled
+                  ]}
+                  onPress={handleUserAddressSubmit}
+                  disabled={loading || !userAddress}
                 >
-                  {userLocation && (
-                    <Marker
-                      coordinate={{
-                        latitude: userLocation.latitude,
-                        longitude: userLocation.longitude,
-                      }}
-                      title="Your Location"
-                    />
-                  )}
-                </MapViewWrapper>
+                  <Text style={styles.buttonText}>
+                    Set My Location
+                  </Text>
+                </TouchableOpacity>
+
+                {locationPermission === 'denied' && (
+                  <TouchableOpacity
+                    style={[styles.button, styles.warningButton]}
+                    onPress={openLocationSettings}
+                  >
+                    <Text style={styles.buttonText}>
+                      Enable Location Services
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {locationPermission !== 'denied' && (
+                  <TouchableOpacity
+                    style={[styles.button, styles.secondaryButton]}
+                    onPress={getUserLocation}
+                  >
+                    <Text style={styles.secondaryButtonText}>
+                      Use My Current Location
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
 
-            <View style={styles.inputContainer}>
-              <LocationInput
-                value={partnerAddress}
-                onChangeText={setPartnerAddress}
-                placeholder="Enter partner's location..."
-              />
-
-              <TravelModePicker
-                selectedMode={travelMode}
-                onModeChange={setTravelMode}
-              />
-
-              <CategoryPicker
-                selectedCategories={selectedCategories}
-                onCategoriesChange={setSelectedCategories}
-              />
-
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  (!partnerAddress || loading) && styles.buttonDisabled
-                ]}
-                onPress={handleSearch}
-                disabled={loading || !partnerAddress}
-              >
-                <Text style={styles.buttonText}>
-                  Find Meeting Point & Places
+              {/* Show error message if any */}
+              {error && (
+                <Text style={styles.error}>
+                  {error}
                 </Text>
-              </TouchableOpacity>
+              )}
             </View>
-
-            {error && <Text style={styles.error}>{error}</Text>}
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </ErrorBoundary>
   );
@@ -273,6 +615,14 @@ export default function App() {
           options={{ title: 'Meet Halfway' }}
         />
         <Stack.Screen
+          name="ChangeLocation"
+          component={ChangeLocationScreen}
+          options={{
+            title: 'Change Location',
+            headerBackTitle: 'Home'
+          }}
+        />
+        <Stack.Screen
           name="Results"
           component={ResultsScreen}
           options={{ title: 'Meeting Places' }}
@@ -281,6 +631,11 @@ export default function App() {
           name="RestaurantDetail"
           component={RestaurantDetailScreen}
           options={({ route }) => ({ title: route.params.restaurant.name })}
+        />
+        <Stack.Screen
+          name="NoResults"
+          component={NoResultsScreen}
+          options={{ title: 'No Results', headerLeft: () => null }}
         />
       </Stack.Navigator>
     </NavigationContainer>

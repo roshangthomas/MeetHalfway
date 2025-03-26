@@ -3,7 +3,7 @@ import { LocationGeocodedAddress } from 'expo-location';
 import axios from 'axios';
 import { GOOGLE_MAPS_API_KEY } from '@env';
 import { Location as LocationType } from '../types';
-import { ERROR_MESSAGES } from '../constants/index';
+import { ERROR_MESSAGES } from '../constants';
 import { PlaceCategory, Restaurant, TravelMode } from '../types';
 
 interface GoogleGeocodingResponse {
@@ -73,11 +73,27 @@ interface GooglePlacesResponse {
 }
 
 export const getCurrentLocation = async (): Promise<LocationType> => {
-    // Hardcoded location for Person 1 (user)
-    return {
-        latitude: 37.94565601059843,
-        longitude: -121.98505722883536,
-    };
+    // Request permission to access location
+    const { status } = await Location.requestForegroundPermissionsAsync();
+
+    if (status !== 'granted') {
+        throw new Error(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
+    }
+
+    try {
+        // Get the current location
+        const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced
+        });
+
+        return {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+        };
+    } catch (error) {
+        console.error('Error getting current location:', error);
+        throw new Error(ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
+    }
 };
 
 export const geocodeAddress = async (address: string): Promise<LocationType> => {

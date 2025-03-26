@@ -50,7 +50,10 @@ export const MAX_CATEGORIES = Object.keys(PLACE_CATEGORY_LABELS).length;
 export type SortOption = 'distance' | 'rating' | 'price' | 'travelTimeDiff';
 
 export type RootStackParamList = {
-    Home: undefined;
+    Home: {
+        newLocation?: Location;
+        newAddress?: string;
+    } | undefined;
     Results: {
         restaurants: Restaurant[];
         userLocation: Location;
@@ -61,6 +64,14 @@ export type RootStackParamList = {
     RestaurantDetail: {
         restaurant: Restaurant;
         userLocation: Location;
-        travelMode?: TravelMode;
+        partnerLocation: Location;
+        travelMode: TravelMode;
+    };
+    NoResults: {
+        errorMessage?: string;
+    };
+    ChangeLocation: {
+        previousLocation: Location | null;
+        previousAddress: string;
     };
 }; 
