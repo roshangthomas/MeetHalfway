@@ -74,4 +74,5 @@ export type RootStackParamList = {
         previousLocation: Location | null;
         previousAddress: string;
     };
+    LocationPermissionDenied: undefined;
 }; 

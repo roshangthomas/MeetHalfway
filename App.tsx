@@ -20,6 +20,7 @@ import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { NoResultsScreen } from './src/screens/NoResultsScreen';
+import { LocationPermissionDeniedScreen } from './src/screens/LocationPermissionDeniedScreen';
 import { Ionicons } from '@expo/vector-icons';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -69,6 +70,10 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
       });
+      // Set location permission to granted since we have location data
+      setLocationPermission('granted');
+      // Clear any errors that might have been set
+      setError(null);
 
       // Clear the parameters to avoid reapplying on subsequent renders
       navigation.setParams({ newLocation: undefined, newAddress: undefined });
@@ -78,20 +83,36 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
   useEffect(() => {
     // Check if location services are enabled when component mounts
     const checkLocationServices = async () => {
-      const enabled = await ExpoLocation.hasServicesEnabledAsync();
-      setLocationServicesEnabled(enabled);
+      try {
+        const enabled = await ExpoLocation.hasServicesEnabledAsync();
+        setLocationServicesEnabled(enabled);
 
-      if (!enabled) {
-        // If location services are disabled, set the appropriate permission state
-        setLocationPermission('denied');
-      } else {
-        // Only request location if services are enabled
-        getUserLocation();
+        if (!enabled) {
+          // If location services are disabled, set the appropriate permission state
+          setLocationPermission('denied');
+          // Navigate to the dedicated location permission denied screen
+          navigation.navigate('LocationPermissionDenied');
+        } else {
+          // Check if we already have permission before requesting location
+          const { status } = await ExpoLocation.requestForegroundPermissionsAsync();
+
+          if (status === 'granted') {
+            // If permission is granted, get the user's location
+            getUserLocation();
+          } else {
+            // If permission is denied, navigate to location permission denied screen
+            setLocationPermission('denied');
+            navigation.navigate('LocationPermissionDenied');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking location services:', error);
+        setError('Failed to check location services. Please try again.');
       }
     };
 
     checkLocationServices();
-  }, []);
+  }, [navigation]);
 
   const getUserLocation = async () => {
     setLoading(true);
@@ -111,6 +132,8 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
       if (error instanceof Error &&
         error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
         setLocationPermission('denied');
+        // Navigate to the dedicated location permission denied screen
+        navigation.navigate('LocationPermissionDenied');
       }
       setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
     } finally {
@@ -444,11 +467,13 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
       if (!enabled) {
         // If location services are disabled, set the appropriate permission state
         setLocationPermission('denied');
+        // Navigate to the dedicated location permission denied screen
+        navigation.navigate('LocationPermissionDenied');
       }
     };
 
     checkLocationServices();
-  }, []);
+  }, [navigation]);
 
   // Function to handle location input focus
   const handleLocationFocus = () => {
@@ -484,6 +509,8 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
       if (error instanceof Error &&
         error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
         setLocationPermission('denied');
+        // Navigate to the dedicated location permission denied screen
+        navigation.navigate('LocationPermissionDenied');
       }
       setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
     } finally {
@@ -608,34 +635,100 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator initialRouteName="Home">
         <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{ title: 'Meet Halfway' }}
-        />
-        <Stack.Screen
-          name="ChangeLocation"
-          component={ChangeLocationScreen}
           options={{
-            title: 'Change Location',
-            headerBackTitle: 'Home'
+            title: 'Meet Halfway',
+            headerStyle: {
+              backgroundColor: COLORS.SURFACE,
+            },
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              color: COLORS.TEXT,
+            },
           }}
         />
         <Stack.Screen
           name="Results"
           component={ResultsScreen}
-          options={{ title: 'Meeting Places' }}
+          options={{
+            title: 'Meeting Places',
+            headerStyle: {
+              backgroundColor: COLORS.SURFACE,
+            },
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              color: COLORS.TEXT,
+            },
+            headerTintColor: COLORS.PRIMARY,
+            headerBackTitleVisible: false,
+          }}
         />
         <Stack.Screen
           name="RestaurantDetail"
           component={RestaurantDetailScreen}
-          options={({ route }) => ({ title: route.params.restaurant.name })}
+          options={({ route }) => ({
+            title: route.params.restaurant.name,
+            headerStyle: {
+              backgroundColor: COLORS.SURFACE,
+            },
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              color: COLORS.TEXT,
+            },
+            headerTintColor: COLORS.PRIMARY,
+            headerBackTitleVisible: false,
+          })}
         />
         <Stack.Screen
           name="NoResults"
           component={NoResultsScreen}
-          options={{ title: 'No Results', headerLeft: () => null }}
+          options={{
+            title: 'No Results',
+            headerStyle: {
+              backgroundColor: COLORS.SURFACE,
+            },
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              color: COLORS.TEXT,
+            },
+            headerTintColor: COLORS.PRIMARY,
+            headerBackTitleVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="ChangeLocation"
+          component={ChangeLocationScreen}
+          options={{
+            title: 'Change Your Location',
+            headerStyle: {
+              backgroundColor: COLORS.SURFACE,
+            },
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              color: COLORS.TEXT,
+            },
+            headerTintColor: COLORS.PRIMARY,
+            headerBackTitleVisible: false,
+          }}
+        />
+        <Stack.Screen
+          name="LocationPermissionDenied"
+          component={LocationPermissionDeniedScreen}
+          options={{
+            title: 'Location Access',
+            headerStyle: {
+              backgroundColor: COLORS.SURFACE,
+            },
+            headerTitleStyle: {
+              fontWeight: 'bold',
+              color: COLORS.TEXT,
+            },
+            headerTintColor: COLORS.PRIMARY,
+            headerBackTitleVisible: false,
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>
