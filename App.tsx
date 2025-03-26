@@ -7,6 +7,7 @@ import { Marker } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { OfflineNotice } from './src/components/OfflineNotice';
 import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces } from './src/services/location';
 import { searchRestaurants, getTravelInfo } from './src/services/places';
 import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
@@ -17,6 +18,7 @@ import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { ResultsScreen } from './src/screens/ResultsScreen';
 import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Header } from '@react-navigation/elements';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -266,7 +268,16 @@ function HomeScreen({ navigation }: HomeScreenProps) {
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator
+        screenOptions={{
+          header: ({ navigation, route, options }) => (
+            <>
+              <Header title={options.title || ''} {...options} />
+              <OfflineNotice />
+            </>
+          ),
+        }}
+      >
         <Stack.Screen
           name="Home"
           component={HomeScreen}
