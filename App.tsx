@@ -13,7 +13,6 @@ import { searchRestaurants, getTravelInfo } from './src/services/places';
 import { Location as LocationType, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
 import { ERROR_MESSAGES } from './src/constants';
-import { COLORS } from './src/constants/colors';
 import { CategoryPicker } from './src/components/CategoryPicker';
 import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { ResultsScreen } from './src/screens/ResultsScreen';
@@ -21,7 +20,6 @@ import { RestaurantDetailScreen } from './src/screens/RestaurantDetailScreen';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { NoResultsScreen } from './src/screens/NoResultsScreen';
-import { Ionicons } from '@expo/vector-icons';
 import { Header } from '@react-navigation/elements';
 
 const Stack = createStackNavigator<RootStackParamList>();
