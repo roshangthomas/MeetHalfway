@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     View,
@@ -7,6 +7,12 @@ import {
     TouchableOpacity,
     Text,
     Platform,
+    Keyboard,
+    Dimensions,
+    NativeSyntheticEvent,
+    TextInputFocusEventData,
+    findNodeHandle,
+    UIManager,
 } from 'react-native';
 import { getPlacePredictions } from '../services/places';
 import { COLORS } from '../constants/colors';
@@ -15,15 +21,26 @@ interface LocationInputProps {
     value: string | null;
     onChangeText: (text: string) => void;
     placeholder: string;
+    onInputFocus?: () => void;
 }
+
+type Suggestion = {
+    id: string;
+    description: string;
+};
 
 export const LocationInput: React.FC<LocationInputProps> = ({
     value,
     onChangeText,
     placeholder,
+    onInputFocus,
 }) => {
     const [predictions, setPredictions] = useState<Array<{ description: string; place_id: string }>>([]);
     const [showPredictions, setShowPredictions] = useState(false);
+    const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+    const [isFocused, setIsFocused] = useState(false);
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, maxHeight: 200 });
+    const inputRef = useRef<TextInput>(null);
 
     useEffect(() => {
         const fetchPredictions = async () => {
@@ -41,23 +58,75 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         return () => clearTimeout(debounceTimeout);
     }, [value]);
 
+    useEffect(() => {
+        if (value) {
+            setSuggestions(predictions.map(p => ({ id: p.place_id, description: p.description })));
+        } else {
+            setSuggestions([]);
+        }
+    }, [predictions, value]);
+
+    useEffect(() => {
+        const keyboardDidShowListener = Keyboard.addListener(
+            'keyboardDidShow',
+            (e) => {
+                if (inputRef.current) {
+                    const nodeHandle = findNodeHandle(inputRef.current);
+                    if (nodeHandle) {
+                        UIManager.measure(nodeHandle, (x, y, width, height, pageX, pageY) => {
+                            const screenHeight = Dimensions.get('window').height;
+                            const keyboardHeight = e.endCoordinates.height;
+                            const inputBottom = pageY + height;
+                            const availableSpace = screenHeight - inputBottom - keyboardHeight - 10;
+
+                            setDropdownPosition({
+                                top: height,
+                                maxHeight: Math.min(200, availableSpace)
+                            });
+                        });
+                    }
+                }
+            }
+        );
+
+        return () => {
+            keyboardDidShowListener.remove();
+        };
+    }, []);
+
     const handleSelectPrediction = (prediction: string) => {
-        // Add a small delay to ensure the touch event completes properly
-        requestAnimationFrame(() => {
-            onChangeText(prediction);
-            setShowPredictions(false);
-        });
+        onChangeText(prediction);
+        setShowPredictions(false);
+        Keyboard.dismiss();
+    };
+
+    const handleSelectSuggestion = (suggestion: Suggestion) => {
+        onChangeText(suggestion.description);
+        setSuggestions([]);
+        Keyboard.dismiss();
+    };
+
+    const handleFocus = () => {
+        setIsFocused(true);
+        if (onInputFocus) {
+            onInputFocus();
+        }
     };
 
     return (
         <View style={styles.container}>
             <View style={styles.inputWrapper}>
                 <TextInput
+                    ref={inputRef}
                     style={styles.input}
                     value={value || ''}
                     onChangeText={onChangeText}
                     placeholder={placeholder}
                     placeholderTextColor={COLORS.TEXT_SECONDARY}
+                    onFocus={handleFocus}
+                    onBlur={() => {
+                        setTimeout(() => setIsFocused(false), 200);
+                    }}
                 />
             </View>
 
@@ -78,6 +147,34 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                                 <Text style={styles.predictionText}>
                                     {prediction.description}
                                 </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
+            {isFocused && suggestions.length > 0 && (
+                <View
+                    style={[
+                        styles.suggestionsContainer,
+                        {
+                            top: dropdownPosition.top,
+                            maxHeight: dropdownPosition.maxHeight
+                        }
+                    ]}
+                >
+                    <ScrollView
+                        keyboardShouldPersistTaps="handled"
+                        style={styles.scrollView}
+                        nestedScrollEnabled={true}
+                    >
+                        {suggestions.map((suggestion) => (
+                            <TouchableOpacity
+                                key={suggestion.id}
+                                style={styles.suggestionItem}
+                                onPress={() => handleSelectSuggestion(suggestion)}
+                            >
+                                <Text style={styles.suggestionText}>{suggestion.description}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
@@ -144,5 +241,28 @@ const styles = StyleSheet.create({
     predictionText: {
         fontSize: 14,
         color: COLORS.TEXT,
+    },
+    suggestionsContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        backgroundColor: 'white',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 3,
+        zIndex: 2,
+    },
+    suggestionItem: {
+        padding: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    suggestionText: {
+        fontSize: 14,
     },
 }); 
