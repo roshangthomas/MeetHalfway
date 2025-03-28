@@ -1,0 +1,16 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "jsx": "react",
+        "types": [
+            "jest",
+            "node",
+            "@testing-library/jest-native"
+        ]
+    },
+    "include": [
+        "**/__tests__/**/*",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+    ]
+}
