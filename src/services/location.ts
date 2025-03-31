@@ -98,7 +98,7 @@ export const getCurrentLocation = async (): Promise<LocationType> => {
 
 export const geocodeAddress = async (address: string): Promise<LocationType> => {
     try {
-        console.log(`Geocoding address: ${address}`);
+        // console.log(`Geocoding address: ${address}`);
 
         const response = await axios.get<GoogleGeocodingResponse>(
             `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
@@ -163,7 +163,7 @@ export const calculateRoadMidpoint = async (
     locationB: LocationType
 ): Promise<LocationType> => {
     try {
-        console.log(`Calculating road midpoint between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
+        // console.log(`Calculating road midpoint between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
 
         // Get directions between the two points
         const response = await axios.get<GoogleDirectionsResponse>(
@@ -183,7 +183,7 @@ export const calculateRoadMidpoint = async (
         const totalDistance = legs.distance.value; // in meters
         const halfDistance = totalDistance / 2;
 
-        console.log(`Total route distance: ${totalDistance}m, halfway point: ${halfDistance}m`);
+        // // // // console.log(`Total route distance: ${totalDistance}m, halfway point: ${halfDistance}m`);
 
         // Find the midpoint by traversing the route steps
         let distanceCovered = 0;
@@ -244,7 +244,7 @@ export const findOptimalMeetingPlaces = async (
     maxResults: number = 20
 ): Promise<Restaurant[]> => {
     try {
-        console.log(`Finding optimal meeting places between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
+        // console.log(`Finding optimal meeting places between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
 
         // Use the new practical midpoint function instead of road midpoint
         let midpoint;
@@ -265,7 +265,7 @@ export const findOptimalMeetingPlaces = async (
                 );
 
                 if (!response.data.results || response.data.results.length === 0) {
-                    console.log(`No ${category} found near the midpoint`);
+                    // console.log(`No ${category} found near the midpoint`);
                     continue;
                 }
 
@@ -455,7 +455,7 @@ export const findPracticalMidpoint = async (
     travelMode: TravelMode = 'driving'
 ): Promise<LocationType> => {
     try {
-        console.log(`Finding practical midpoint between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
+        // (`Finding practical midpoint between ${locationA.latitude},${locationA.longitude} and ${locationB.latitude},${locationB.longitude}`);
 
         // Step 1: Calculate road midpoint
         let roadMidpoint;
@@ -477,18 +477,18 @@ export const findPracticalMidpoint = async (
         const searchRadii = [500, 1500, 3000, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000]; // Increasing search radii in meters
 
         for (const radius of searchRadii) {
-            console.log(`Searching for venues within ${radius}m of midpoint`);
+            // console.log(`Searching for venues within ${radius}m of midpoint`);
             venues = await searchNearbyVenues(roadMidpoint, radius, venueTypes);
 
             if (venues.length > 0) {
-                console.log(`Found ${venues.length} venues within ${radius}m`);
+                // console.log(`Found ${venues.length} venues within ${radius}m`);
                 break;
             }
         }
 
         // If still no venues, return the road midpoint
         if (venues.length === 0) {
-            console.log('No venues found in any search radius, returning road midpoint');
+            // console.log('No venues found in any search radius, returning road midpoint');
             return roadMidpoint;
         }
 
@@ -556,8 +556,8 @@ export const findPracticalMidpoint = async (
         // Log the top venue for debugging
         if (scoredVenues.length > 0) {
             const topVenue = scoredVenues[0];
-            console.log(`Selected practical midpoint: ${topVenue.name} with score ${topVenue.score.toFixed(2)}`);
-            console.log(`Travel times: Person A: ${topVenue.travelTimeA}min, Person B: ${topVenue.travelTimeB}min`);
+            // console.log(`Selected practical midpoint: ${topVenue.name} with score ${topVenue.score.toFixed(2)}`);
+            // console.log(`Travel times: Person A: ${topVenue.travelTimeA}min, Person B: ${topVenue.travelTimeB}min`);
         }
 
         // Return the location of the highest-scoring venue
