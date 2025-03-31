@@ -62,7 +62,7 @@ export const searchRestaurants = async (
     category: PlaceCategory
 ): Promise<Restaurant[]> => {
     try {
-        console.log(`Searching for ${category} near ${location.latitude},${location.longitude}`);
+        // console.log(`Searching for ${category} near ${location.latitude},${location.longitude}`);
 
         const response = await axios.get<GooglePlacesResponse>(
             `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${location.latitude
@@ -70,7 +70,7 @@ export const searchRestaurants = async (
         );
 
         if (response.data.results.length === 0) {
-            console.log(`No ${category} found near the specified location`);
+            // console.log(`No ${category} found near the specified location`);
             return [];
         }
 
