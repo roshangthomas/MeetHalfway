@@ -621,7 +621,7 @@ export default function App() {
         <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{ title: 'Meet Halfway' }}
+          options={{ title: 'Whats Halfway' }}
         />
         <Stack.Screen
           name="ChangeLocation"

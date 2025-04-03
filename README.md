@@ -1,4 +1,4 @@
-# MeetHalfway
+# Whats Halfway
 
 A React Native app that helps two people find restaurants at a convenient midpoint location between them.
 
@@ -65,7 +65,7 @@ The app uses a sophisticated algorithm to find the best meeting places:
 The app requires location permissions to function:
 
 - iOS: The first time you run the app, it will prompt for location permissions
-- Android: You may need to manually enable location permissions in Settings > Apps > MeetHalfway > Permissions
+- Android: You may need to manually enable location permissions in Settings > Apps > Whats Halfway > Permissions
 
 ## Customization
 
