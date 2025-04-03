@@ -27,6 +27,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.yourcompany.meethalfway",
+      "versionCode": 2,
       "config": {
         "googleMaps": {
           "apiKey": "${GOOGLE_MAPS_API_KEY}"
