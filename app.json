@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MeetHalfway",
-    "slug": "MeetHalfway",
+    "name": "Whats Halfway",
+    "slug": "whatshalfway",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.meethalfway",
+      "bundleIdentifier": "com.whatshalfway",
       "config": {
         "googleMapsApiKey": "${GOOGLE_MAPS_API_KEY}"
       }
@@ -26,7 +26,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.meethalfway",
+      "package": "com.whatshalfway",
       "versionCode": 2,
       "config": {
         "googleMaps": {
