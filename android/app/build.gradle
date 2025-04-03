@@ -109,10 +109,10 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file(keystoreProperties['storeFile'])
-            storePassword keystoreProperties['storePassword']
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
+            storeFile file('whatshalfway-release.keystore')
+            storePassword 'jackthecat1'
+            keyAlias 'whatshalfway'
+            keyPassword 'jackthecat1'
         }
     }
     buildTypes {

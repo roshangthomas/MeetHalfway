@@ -13,7 +13,7 @@ install! 'cocoapods',
 
 prepare_react_native_project!
 
-target 'MeetHalfway' do
+target 'WhatsHalfway' do
   use_expo_modules!
   pod 'GoogleMaps'
   pod 'Google-Maps-iOS-Utils'

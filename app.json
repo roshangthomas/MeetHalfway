@@ -57,6 +57,11 @@
         "ttf",
         "otf"
       ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "9903bdb9-a4d8-4053-9b23-b15d3d769422"
+      }
     }
   }
 }
