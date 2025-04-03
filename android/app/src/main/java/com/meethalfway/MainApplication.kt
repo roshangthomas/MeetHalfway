@@ -1,4 +1,4 @@
-package com.yourcompany.meethalfway
+package com.meethalfway
 
 import android.app.Application
 import android.content.res.Configuration

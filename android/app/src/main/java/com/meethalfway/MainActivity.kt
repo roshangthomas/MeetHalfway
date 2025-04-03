@@ -1,4 +1,4 @@
-package com.yourcompany.meethalfway
+package com.meethalfway
 
 import android.os.Build
 import android.os.Bundle
