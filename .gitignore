@@ -76,3 +76,5 @@ ios/Pods/
 ios/build/
 ios/*.xcworkspace
 ios/*.xcodeproj/xcuserdata
+
+playstore.json
