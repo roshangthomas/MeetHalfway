@@ -27,7 +27,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.whatshalfway",
-      "versionCode": 2,
+      "versionCode": 1,
       "config": {
         "googleMaps": {
           "apiKey": "${GOOGLE_MAPS_API_KEY}"
@@ -57,11 +57,6 @@
         "ttf",
         "otf"
       ]
-    },
-    "extra": {
-      "eas": {
-        "projectId": "d97aaf43-2193-4a3a-84f5-e4c515538006"
-      }
     }
   }
 }
