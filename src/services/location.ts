@@ -261,7 +261,7 @@ export const findOptimalMeetingPlaces = async (
         for (const category of categories) {
             try {
                 const response = await axios.get<GooglePlacesResponse>(
-                    `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${midpoint.latitude},${midpoint.longitude}&radius=1500&type=${category}&key=${GOOGLE_MAPS_API_KEY}`
+                    `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${midpoint.latitude},${midpoint.longitude}&radius=5000&type=${category}&key=${GOOGLE_MAPS_API_KEY}`
                 );
 
                 if (!response.data.results || response.data.results.length === 0) {
@@ -469,7 +469,7 @@ export const findPracticalMidpoint = async (
         // Define venue types that are suitable for meetings
         const venueTypes = [
             'restaurant', 'cafe', 'bar', 'shopping_mall', 'department_store',
-            'supermarket', 'bakery', 'library', 'park', 'book_store'
+            'supermarket', 'bakery', 'library', 'park', 'book_store', 'movie_theater'
         ].join('|');
 
         // Step 2: Search for venues with progressively larger radii until we find some
