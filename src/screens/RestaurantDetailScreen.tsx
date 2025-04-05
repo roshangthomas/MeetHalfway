@@ -77,12 +77,29 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
     const getDirections = () => {
         const destination = `${restaurant.latitude},${restaurant.longitude}`;
 
-        const url = Platform.select({
-            ios: `maps://app?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=${getAppleMapsDirectionFlag(travelMode)}`,
-            android: `google.navigation:q=${destination}&mode=${travelMode}`
-        });
+        let url;
+        if (Platform.OS === 'ios') {
+            // Use alternative Apple Maps URL scheme for better control of transport mode
+            if (travelMode === 'driving') {
+                // Specific format for driving directions
+                url = `http://maps.apple.com/?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=d`;
+            } else {
+                // Format for other travel modes
+                const dirFlag = getAppleMapsDirectionFlag(travelMode);
+                url = `http://maps.apple.com/?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=${dirFlag}`;
+            }
+        } else {
+            // Use the Google Maps directions URL to show preview instead of starting navigation directly
+            url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${destination}&travelmode=${travelMode}`;
+
+            // Optional: Add restaurant place ID for better location pinpointing
+            if (restaurant.id) {
+                url += `&destination_place_id=${restaurant.id}`;
+            }
+        }
 
         if (url) {
+            console.log(`Opening maps with URL: ${url}, travel mode: ${travelMode}`);
             Linking.openURL(url).catch(err =>
                 console.error('An error occurred while opening maps', err)
             );
