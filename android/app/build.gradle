@@ -100,7 +100,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 12
         versionName "1.0"
+
+        // Add the Google Maps API key from environment variable
+        resValue "string", "google_maps_api_key", System.getenv("GOOGLE_MAPS_API_KEY") ?: ""
     }
+    
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

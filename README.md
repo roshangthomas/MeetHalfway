@@ -60,6 +60,30 @@ The app uses a sophisticated algorithm to find the best meeting places:
 - GOOGLE_MAPS_API_KEY
 - GOOGLE_PLACES_API_KEY
 
+## Secure API Key Handling
+
+For Android builds, the app is configured to securely handle Google Maps API keys:
+
+1. The Google Maps API key is stored as an EAS secret, not in the source code
+2. During the EAS build process, the key is automatically injected into the app
+3. The API key is never committed to Git
+
+## EAS Build Instructions
+
+To build the app using EAS (Expo Application Services), follow these steps:
+
+1. Store your API key as an EAS secret (one-time setup):
+   ```
+   eas secret:create --scope project --name GOOGLE_MAPS_API_KEY --value "YOUR_API_KEY_HERE"
+   ```
+
+2. Build the app:
+   ```
+   eas build --platform android --profile production
+   ```
+
+This approach securely handles your API key without storing it in your codebase.
+
 ## Location Permissions
 
 The app requires location permissions to function:
