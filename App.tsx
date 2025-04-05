@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager, Alert, AppState } from 'react-native';
@@ -24,6 +24,8 @@ import { Header } from '@react-navigation/elements';
 import { LocationPermissionScreen } from './src/screens/LocationPermissionScreen';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from './src/constants/colors';
+import * as SplashScreen from 'expo-splash-screen';
+import { AnimatedSplash } from './src/components/AnimatedSplash';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -805,50 +807,98 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
 }
 
 export default function App() {
+  const [appIsReady, setAppIsReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        // Keep native splash screen visible while we prepare
+        await SplashScreen.preventAutoHideAsync();
+
+        // Preload any assets or data here if needed
+
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
+  }, []);
+
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      // Hide the native splash screen
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
+
+  const handleSplashFinish = () => {
+    setShowSplash(false);
+  };
+
+  // If app is not ready yet, return null to keep native splash
+  if (!appIsReady) {
+    return null;
+  }
+
   return (
-    <NavigationContainer>
-      <ErrorBoundary>
-        <OfflineNotice />
-        <Stack.Navigator>
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ title: 'Whats Halfway' }}
-          />
-          <Stack.Screen
-            name="ChangeLocation"
-            component={ChangeLocationScreen}
-            options={{
-              title: 'Change Location',
-              headerBackTitle: 'Home'
-            }}
-          />
-          <Stack.Screen
-            name="LocationPermission"
-            component={LocationPermissionScreen}
-            options={{
-              title: 'Location Access',
-              headerLeft: () => null, // This removes the back button
-              gestureEnabled: false // This prevents iOS swipe back gesture
-            }}
-          />
-          <Stack.Screen
-            name="Results"
-            component={ResultsScreen}
-            options={{ title: 'Meeting Places' }}
-          />
-          <Stack.Screen
-            name="RestaurantDetail"
-            component={RestaurantDetailScreen}
-            options={({ route }) => ({ title: route.params.restaurant.name })}
-          />
-          <Stack.Screen
-            name="NoResults"
-            component={NoResultsScreen}
-            options={{ title: 'No Results', headerLeft: () => null }}
-          />
-        </Stack.Navigator>
-      </ErrorBoundary>
-    </NavigationContainer>
+    <>
+      <NavigationContainer onReady={onLayoutRootView}>
+        <ErrorBoundary>
+          <OfflineNotice />
+          <Stack.Navigator>
+            <Stack.Screen
+              name="Home"
+              component={HomeScreen}
+              options={{ title: 'Whats Halfway' }}
+            />
+            <Stack.Screen
+              name="ChangeLocation"
+              component={ChangeLocationScreen}
+              options={{
+                title: 'Change Location',
+                headerBackTitle: 'Home'
+              }}
+            />
+            <Stack.Screen
+              name="LocationPermission"
+              component={LocationPermissionScreen}
+              options={{
+                title: 'Location Access',
+                headerLeft: () => null, // This removes the back button
+                gestureEnabled: false // This prevents iOS swipe back gesture
+              }}
+            />
+            <Stack.Screen
+              name="Results"
+              component={ResultsScreen}
+              options={{ title: 'Meeting Places' }}
+            />
+            <Stack.Screen
+              name="RestaurantDetail"
+              component={RestaurantDetailScreen}
+              options={({ route }) => ({ title: route.params.restaurant.name })}
+            />
+            <Stack.Screen
+              name="NoResults"
+              component={NoResultsScreen}
+              options={{ title: 'No Results', headerLeft: () => null }}
+            />
+          </Stack.Navigator>
+        </ErrorBoundary>
+      </NavigationContainer>
+
+      {/* Show animated splash on top if needed */}
+      {showSplash && (
+        <AnimatedSplash
+          message="Getting everything ready..."
+          onAnimationFinish={handleSplashFinish}
+          duration={2000}
+        />
+      )}
+    </>
   );
 }

@@ -10,7 +10,7 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff",
-      "minimumDisplayTime": 3000,
+      "minimumDisplayTime": 500,
       "androidScaleType": "centerCrop",
       "androidSplashMode": "fullscreen"
     },
@@ -30,7 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.whatshalfway",
-      "versionCode": 13,
+      "versionCode": 14,
       "config": {
         "googleMaps": {
           "apiKey": "${GOOGLE_MAPS_API_KEY}"
@@ -53,7 +53,13 @@
           }
         }
       ],
-      "expo-location"
+      "expo-location",
+      [
+        "expo-splash-screen",
+        {
+          "showTextLabel": false
+        }
+      ]
     ],
     "packagerOpts": {
       "assetExts": [
