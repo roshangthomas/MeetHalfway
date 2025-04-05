@@ -8,8 +8,11 @@
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "resizeMode": "cover",
+      "backgroundColor": "#ffffff",
+      "minimumDisplayTime": 3000,
+      "androidScaleType": "centerCrop",
+      "androidSplashMode": "fullscreen"
     },
     "assetBundlePatterns": [
       "**/*"

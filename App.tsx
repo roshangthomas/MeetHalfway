@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager, Alert, AppState } from 'react-native';
 import MapViewWrapper from './src/components/MapViewWrapper';
 import { Marker, Region } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
@@ -366,11 +366,44 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
       [
         {
           text: "Cancel",
-          style: "cancel"
+          style: "cancel",
+          onPress: () => {
+            console.log("User canceled precise location permission prompt");
+            // User explicitly declined to improve location precision
+            // We continue with approximate location - no action needed
+          }
         },
         {
           text: "Open Settings",
-          onPress: openLocationSettings
+          onPress: () => {
+            // Track that settings were opened for location permissions
+            openLocationSettings();
+
+            // Add listener for when app comes back to foreground
+            const appStateSubscription = AppState.addEventListener('change', async (nextAppState: string) => {
+              if (nextAppState === 'active') {
+                // App has returned to foreground, check permission status again
+                console.log("App returned to foreground, checking location permissions");
+                // Remove the listener to avoid multiple checks
+                appStateSubscription.remove();
+
+                // Re-check precise location permission
+                const newPermissionStatus = await checkPreciseLocationPermission();
+                if (newPermissionStatus === 'limited') {
+                  // User returned without upgrading to precise location
+                  console.log("User returned from settings but still has limited location precision");
+                  // Update state to ensure UI still shows the warning
+                  setLocationPermission('limited');
+                } else if (newPermissionStatus === 'granted') {
+                  // User successfully upgraded to precise location
+                  console.log("User upgraded to precise location");
+                  setLocationPermission('granted');
+                  // Refresh location with precise coordinates
+                  getUserLocation();
+                }
+              }
+            });
+          }
         }
       ]
     );
@@ -629,11 +662,44 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
       [
         {
           text: "Cancel",
-          style: "cancel"
+          style: "cancel",
+          onPress: () => {
+            console.log("User canceled precise location permission prompt");
+            // User explicitly declined to improve location precision
+            // We continue with approximate location - no action needed
+          }
         },
         {
           text: "Open Settings",
-          onPress: openLocationSettings
+          onPress: () => {
+            // Track that settings were opened for location permissions
+            openLocationSettings();
+
+            // Add listener for when app comes back to foreground
+            const appStateSubscription = AppState.addEventListener('change', async (nextAppState: string) => {
+              if (nextAppState === 'active') {
+                // App has returned to foreground, check permission status again
+                console.log("App returned to foreground, checking location permissions");
+                // Remove the listener to avoid multiple checks
+                appStateSubscription.remove();
+
+                // Re-check precise location permission
+                const newPermissionStatus = await checkPreciseLocationPermission();
+                if (newPermissionStatus === 'limited') {
+                  // User returned without upgrading to precise location
+                  console.log("User returned from settings but still has limited location precision");
+                  // Update state to ensure UI still shows the warning
+                  setLocationPermission('limited');
+                } else if (newPermissionStatus === 'granted') {
+                  // User successfully upgraded to precise location
+                  console.log("User upgraded to precise location");
+                  setLocationPermission('granted');
+                  // Refresh location with precise coordinates
+                  getUserLocation();
+                }
+              }
+            });
+          }
         }
       ]
     );
