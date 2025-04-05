@@ -12,7 +12,7 @@ interface AnimatedSplashProps {
 export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({
     message = 'Getting app ready...',
     onAnimationFinish,
-    duration = 2000
+    duration = 1000
 }) => {
     const animationRef = useRef<LottieView>(null);
 
@@ -34,11 +34,8 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({
                 ref={animationRef}
                 source={require('../assets/animations/car-loading.json')}
                 autoPlay
-                loop
+                loop={false}
                 style={styles.animation}
-                onLayout={() => {
-                    animationRef.current?.play();
-                }}
             />
             <Text style={styles.message}>{message}</Text>
         </View>
@@ -65,8 +62,8 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     animation: {
-        width: 200,
-        height: 200,
+        width: 150,
+        height: 150,
     },
     message: {
         marginTop: 20,

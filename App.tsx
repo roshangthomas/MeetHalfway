@@ -80,6 +80,18 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
     }
   }, [route.params?.newLocation, route.params?.newAddress, navigation]);
 
+  // Set default map region if none exists but we have userLocation
+  useEffect(() => {
+    if (userLocation && !mapRegion) {
+      setMapRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+    }
+  }, [userLocation, mapRegion]);
+
   useEffect(() => {
     // Check if location services are enabled when component mounts
     const checkLocationServices = async () => {
@@ -105,7 +117,12 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
       }
     };
 
-    checkLocationServices();
+    // Add a small delay before checking location services to prioritize UI rendering
+    const timerId = setTimeout(() => {
+      checkLocationServices();
+    }, 100);
+
+    return () => clearTimeout(timerId);
   }, [navigation, route.params?.newLocation, route.params?.newAddress, userAddress]);
 
   const getUserLocation = async () => {
@@ -446,13 +463,24 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
                 <View style={styles.mapContainer}>
                   <MapViewWrapper
                     style={styles.map}
-                    region={mapRegion || undefined}
+                    region={mapRegion || {
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                      latitudeDelta: 0.0922,
+                      longitudeDelta: 0.0421,
+                    }}
+                    initialRegion={{
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                      latitudeDelta: 0.0922,
+                      longitudeDelta: 0.0421,
+                    }}
                   >
                     {userLocation && (
                       <Marker
                         coordinate={{
-                          latitude: (userLocation as LocationType).latitude,
-                          longitude: (userLocation as LocationType).longitude,
+                          latitude: userLocation.latitude,
+                          longitude: userLocation.longitude,
                         }}
                         title="Your Location"
                       />
@@ -816,11 +844,10 @@ export default function App() {
         // Keep native splash screen visible while we prepare
         await SplashScreen.preventAutoHideAsync();
 
-        // Preload any assets or data here if needed
-
+        // Set app as ready immediately without delay
+        setAppIsReady(true);
       } catch (e) {
         console.warn(e);
-      } finally {
         setAppIsReady(true);
       }
     }
@@ -891,12 +918,12 @@ export default function App() {
         </ErrorBoundary>
       </NavigationContainer>
 
-      {/* Show animated splash on top if needed */}
+      {/* Show animated splash with reduced duration */}
       {showSplash && (
         <AnimatedSplash
           message="Getting everything ready..."
           onAnimationFinish={handleSplashFinish}
-          duration={2000}
+          duration={1000}
         />
       )}
     </>

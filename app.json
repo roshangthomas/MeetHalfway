@@ -10,7 +10,7 @@
       "image": "./assets/splash-icon.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff",
-      "minimumDisplayTime": 500,
+      "minimumDisplayTime": 0,
       "androidScaleType": "centerCrop",
       "androidSplashMode": "fullscreen"
     },
