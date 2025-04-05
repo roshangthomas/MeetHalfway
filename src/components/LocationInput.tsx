@@ -49,11 +49,16 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         // Only fetch predictions if no selection was just made
         if (!selectionMadeRef.current) {
             const fetchPredictions = async () => {
+                console.log('fetchPredictions called with value:', value);
                 if (value && value.length > 2) {
+                    console.log('Fetching predictions for:', value);
                     const results = await getPlacePredictions(value);
+                    console.log('Prediction results:', results);
                     setPredictions(results.slice(0, 5)); // Limit to 5 results
                     setShowPredictions(true);
+                    console.log('showPredictions set to:', true);
                 } else {
+                    console.log('Input too short or empty, clearing predictions');
                     setPredictions([]);
                     setShowPredictions(false);
                 }
@@ -64,6 +69,7 @@ export const LocationInput: React.FC<LocationInputProps> = ({
         } else {
             // Reset the selection flag after handling the value change
             selectionMadeRef.current = false;
+            console.log('Selection was just made, skipping prediction fetch');
         }
     }, [value]);
 

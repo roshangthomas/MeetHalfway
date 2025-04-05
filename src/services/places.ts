@@ -141,19 +141,34 @@ export const getTravelInfo = async (
 
 export const getPlacePredictions = async (input: string): Promise<PlacePrediction[]> => {
     try {
-        const response = await axios.get<GooglePlacesAutocompleteResponse>(
-            `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-                input
-            )}&key=${GOOGLE_MAPS_API_KEY}`
-        );
-
+        console.log('getPlacePredictions called with input:', input);
+        console.log('API Key available:', !!GOOGLE_MAPS_API_KEY);
+        
+        const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+            input
+        )}&key=${GOOGLE_MAPS_API_KEY}`;
+        console.log('Requesting URL:', url);
+        
+        const response = await axios.get<GooglePlacesAutocompleteResponse>(url);
+        
+        console.log('API Response status:', response.data.status);
+        console.log('API Response predictions count:', response.data.predictions?.length || 0);
+        
         if (response.data.status !== 'OK') {
+            console.warn('API returned non-OK status:', response.data.status);
             return [];
         }
 
         return response.data.predictions;
     } catch (error) {
         console.error('Failed to get place predictions:', error);
+        // Type-safe error handling
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as { response?: { data?: any } };
+            if (axiosError.response?.data) {
+                console.error('API error response:', axiosError.response.data);
+            }
+        }
         return [];
     }
 };

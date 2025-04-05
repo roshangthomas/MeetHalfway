@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform, Linking, Image, KeyboardAvoidingView, findNodeHandle, UIManager, Alert } from 'react-native';
 import MapViewWrapper from './src/components/MapViewWrapper';
 import { Marker, Region } from 'react-native-maps';
 import { LocationInput } from './src/components/LocationInput';
 import { TravelModePicker } from './src/components/TravelModePicker';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { OfflineNotice } from './src/components/OfflineNotice';
-import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces } from './src/services/location';
+import { getCurrentLocation, geocodeAddress, calculateMidpoint, calculateRoadMidpoint, findOptimalMeetingPlaces, checkPreciseLocationPermission, LocationPermissionStatus } from './src/services/location';
 import { searchRestaurants, getTravelInfo } from './src/services/places';
 import { Location as LocationType, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from './src/types';
 import { styles } from './src/styles/App.styles';
-import { ERROR_MESSAGES } from './src/constants';
+import { ERROR_MESSAGES } from './src/constants/index';
 import { CategoryPicker } from './src/components/CategoryPicker';
 import { LoadingOverlay } from './src/components/LoadingOverlay';
 import { ResultsScreen } from './src/screens/ResultsScreen';
@@ -21,6 +21,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { NoResultsScreen } from './src/screens/NoResultsScreen';
 import { Header } from '@react-navigation/elements';
+import { LocationPermissionScreen } from './src/screens/LocationPermissionScreen';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from './src/constants/colors';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -48,7 +51,7 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
   const [userLocation, setUserLocation] = useState<LocationType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
+  const [locationPermission, setLocationPermission] = useState<LocationPermissionStatus>('pending');
   const [travelMode, setTravelMode] = useState<TravelMode>('driving');
   const [selectedCategories, setSelectedCategories] = useState<PlaceCategory[]>(['restaurant']);
   const [mapRegion, setMapRegion] = useState<Region | null>(null);
@@ -78,12 +81,22 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
   useEffect(() => {
     // Check if location services are enabled when component mounts
     const checkLocationServices = async () => {
+      // If we already have a location from params or userAddress is set, skip location services check
+      if ((route.params?.newLocation && route.params?.newAddress) || userAddress) {
+        return;
+      }
+
       const enabled = await ExpoLocation.hasServicesEnabledAsync();
       setLocationServicesEnabled(enabled);
 
       if (!enabled) {
         // If location services are disabled, set the appropriate permission state
         setLocationPermission('denied');
+        // Navigate to LocationPermission screen
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'LocationPermission' }],
+        });
       } else {
         // Only request location if services are enabled
         getUserLocation();
@@ -91,11 +104,31 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
     };
 
     checkLocationServices();
-  }, []);
+  }, [navigation, route.params?.newLocation, route.params?.newAddress, userAddress]);
 
   const getUserLocation = async () => {
+    // If we already have a manual location set, don't attempt to get current location
+    if (userAddress) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
+      // First check the precise location permission status
+      const permissionStatus = await checkPreciseLocationPermission();
+      setLocationPermission(permissionStatus);
+
+      if (permissionStatus === 'denied') {
+        // Navigate to LocationPermission screen with no way to go back if completely denied
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'LocationPermission' }],
+        });
+        throw new Error(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
+      }
+
+      // Call getCurrentLocation which now handles both precise and approximate permissions
       const location = await getCurrentLocation();
       setUserLocation(location);
       setMapRegion({
@@ -104,15 +137,27 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
       });
-      setLocationPermission('granted');
+
+      // Set error to null as we successfully got location (even if approximate)
       setError(null);
     } catch (error) {
       console.error('Failed to get user location:', error);
       if (error instanceof Error &&
         error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
         setLocationPermission('denied');
+
+        // Only redirect to permission screen if we don't already have a user address
+        if (!userAddress) {
+          // Navigate to LocationPermission screen with no way to go back
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'LocationPermission' }],
+          });
+          setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
+        }
+      } else {
+        setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
       }
-      setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
     } finally {
       setLoading(false);
     }
@@ -313,10 +358,29 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
     }, 300);
   };
 
+  // Add a function to upgrade to precise location
+  const promptForPreciseLocation = () => {
+    Alert.alert(
+      "Precise Location Needed",
+      "For better accuracy, please enable precise location in your device settings.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Open Settings",
+          onPress: openLocationSettings
+        }
+      ]
+    );
+  };
+
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
         <LoadingOverlay visible={loading} />
+        <OfflineNotice />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardAvoidingContainer}
@@ -329,6 +393,20 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
             contentContainerStyle={styles.scrollViewContent}
           >
             <View style={styles.content}>
+              {/* Limited location precision warning for Android */}
+              {locationPermission === 'limited' && Platform.OS === 'android' && (
+                <TouchableOpacity
+                  style={styles.warningBanner}
+                  onPress={promptForPreciseLocation}
+                >
+                  <Ionicons name="warning-outline" size={18} color={COLORS.PRIMARY} />
+                  <Text style={styles.warningText}>
+                    {ERROR_MESSAGES.LOCATION_PRECISION_LIMITED}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.PRIMARY} />
+                </TouchableOpacity>
+              )}
+
               {userLocation && (
                 <View style={styles.mapContainer}>
                   <MapViewWrapper
@@ -428,12 +506,19 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
   const [userLocation, setUserLocation] = useState<LocationType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'pending'>('pending');
+  const [locationPermission, setLocationPermission] = useState<LocationPermissionStatus>('pending');
   const [locationServicesEnabled, setLocationServicesEnabled] = useState<boolean | null>(null);
 
   // Add ScrollView ref
   const scrollViewRef = useRef<ScrollView>(null);
   const locationInputRef = useRef<View>(null);
+
+  // Check if we were navigated here due to permission denial
+  useEffect(() => {
+    if (route.params?.permissionDenied) {
+      setLocationPermission('denied');
+    }
+  }, [route.params?.permissionDenied]);
 
   useEffect(() => {
     // Check if location services are enabled when component mounts
@@ -468,9 +553,16 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
   const getUserLocation = async () => {
     setLoading(true);
     try {
+      // Use the updated permission check
+      const permissionStatus = await checkPreciseLocationPermission();
+      setLocationPermission(permissionStatus);
+
+      if (permissionStatus === 'denied') {
+        throw new Error(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
+      }
+
       const location = await getCurrentLocation();
       setUserLocation(location);
-      setLocationPermission('granted');
       setError(null);
 
       // Auto-navigate back to home screen with new location
@@ -529,6 +621,24 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
     }
   };
 
+  // Add a function to prompt for precise location
+  const promptForPreciseLocation = () => {
+    Alert.alert(
+      "Precise Location Needed",
+      "For better accuracy, please enable precise location in your device settings.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Open Settings",
+          onPress: openLocationSettings
+        }
+      ]
+    );
+  };
+
   return (
     <ErrorBoundary>
       <SafeAreaView style={styles.container}>
@@ -545,7 +655,41 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
             contentContainerStyle={styles.scrollViewContent}
           >
             <View style={styles.content}>
+              {/* Limited location precision warning for Android */}
+              {locationPermission === 'limited' && Platform.OS === 'android' && (
+                <TouchableOpacity
+                  style={styles.warningBanner}
+                  onPress={promptForPreciseLocation}
+                >
+                  <Ionicons name="warning-outline" size={18} color={COLORS.PRIMARY} />
+                  <Text style={styles.warningText}>
+                    {ERROR_MESSAGES.LOCATION_PRECISION_LIMITED}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.PRIMARY} />
+                </TouchableOpacity>
+              )}
+
               <View style={styles.inputContainer}>
+                {locationPermission === 'denied' && (
+                  <View style={styles.permissionMessageContainer}>
+                    <Text style={styles.permissionTitle}>Location Access Required</Text>
+                    <Text style={styles.permissionText}>
+                      To use your current location, please enable location permissions for this app.
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.button, styles.warningButton]}
+                      onPress={openLocationSettings}
+                    >
+                      <Text style={styles.buttonText}>
+                        Open Location Settings
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.permissionText}>
+                      Alternatively, you can manually enter your location below.
+                    </Text>
+                  </View>
+                )}
+
                 <Text style={styles.label}>Your Location:</Text>
                 <View ref={locationInputRef}>
                   <LocationInput
@@ -567,17 +711,6 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
                     Set My Location
                   </Text>
                 </TouchableOpacity>
-
-                {locationPermission === 'denied' && (
-                  <TouchableOpacity
-                    style={[styles.button, styles.warningButton]}
-                    onPress={openLocationSettings}
-                  >
-                    <Text style={styles.buttonText}>
-                      Enable Location Services
-                    </Text>
-                  </TouchableOpacity>
-                )}
 
                 {locationPermission !== 'denied' && (
                   <TouchableOpacity
@@ -608,45 +741,48 @@ function ChangeLocationScreen({ navigation, route }: ChangeLocationScreenProps) 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{
-          header: ({ navigation, route, options }) => (
-            <>
-              <Header title={options.title || ''} {...options} />
-              <OfflineNotice />
-            </>
-          ),
-        }}
-      >
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{ title: 'Whats Halfway' }}
-        />
-        <Stack.Screen
-          name="ChangeLocation"
-          component={ChangeLocationScreen}
-          options={{
-            title: 'Change Location',
-            headerBackTitle: 'Home'
-          }}
-        />
-        <Stack.Screen
-          name="Results"
-          component={ResultsScreen}
-          options={{ title: 'Meeting Places' }}
-        />
-        <Stack.Screen
-          name="RestaurantDetail"
-          component={RestaurantDetailScreen}
-          options={({ route }) => ({ title: route.params.restaurant.name })}
-        />
-        <Stack.Screen
-          name="NoResults"
-          component={NoResultsScreen}
-          options={{ title: 'No Results', headerLeft: () => null }}
-        />
-      </Stack.Navigator>
+      <ErrorBoundary>
+        <OfflineNotice />
+        <Stack.Navigator>
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ title: 'Whats Halfway' }}
+          />
+          <Stack.Screen
+            name="ChangeLocation"
+            component={ChangeLocationScreen}
+            options={{
+              title: 'Change Location',
+              headerBackTitle: 'Home'
+            }}
+          />
+          <Stack.Screen
+            name="LocationPermission"
+            component={LocationPermissionScreen}
+            options={{
+              title: 'Location Access',
+              headerLeft: () => null, // This removes the back button
+              gestureEnabled: false // This prevents iOS swipe back gesture
+            }}
+          />
+          <Stack.Screen
+            name="Results"
+            component={ResultsScreen}
+            options={{ title: 'Meeting Places' }}
+          />
+          <Stack.Screen
+            name="RestaurantDetail"
+            component={RestaurantDetailScreen}
+            options={({ route }) => ({ title: route.params.restaurant.name })}
+          />
+          <Stack.Screen
+            name="NoResults"
+            component={NoResultsScreen}
+            options={{ title: 'No Results', headerLeft: () => null }}
+          />
+        </Stack.Navigator>
+      </ErrorBoundary>
     </NavigationContainer>
   );
 }

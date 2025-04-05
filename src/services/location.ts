@@ -3,8 +3,87 @@ import { LocationGeocodedAddress } from 'expo-location';
 import axios from 'axios';
 import { GOOGLE_MAPS_API_KEY } from '@env';
 import { Location as LocationType } from '../types';
-import { ERROR_MESSAGES } from '../constants';
+import { ERROR_MESSAGES } from '../constants/index';
 import { PlaceCategory, Restaurant, TravelMode } from '../types';
+import { Platform } from 'react-native';
+
+// Add a new constant for the imprecise location warning
+const LOCATION_PRECISION_WARNINGS = {
+    IMPRECISE_LOCATION: ERROR_MESSAGES.LOCATION_PRECISION_LIMITED,
+};
+
+// Add location permission type
+export type LocationPermissionStatus = 'granted' | 'denied' | 'limited' | 'pending';
+
+// New function to check if we have precise location permission on Android 
+export const checkPreciseLocationPermission = async (): Promise<LocationPermissionStatus> => {
+    // Request permission to access location
+    const { status } = await Location.requestForegroundPermissionsAsync();
+
+    if (status !== 'granted') {
+        return 'denied';
+    }
+
+    // On Android, we need to check for precise location permission
+    if (Platform.OS === 'android') {
+        try {
+            // Get the foreground permissions object on Android which contains accuracy info
+            const permissions = await Location.getForegroundPermissionsAsync();
+
+            // Android API 29+ returns an accuracy property when only approximate location is granted
+            // @ts-ignore - The types for expo-location don't include the accuracy property
+            const accuracy = permissions.android?.accuracy;
+
+            // If accuracy is defined and not "fine", we only have approximate location
+            if (accuracy && accuracy !== 'fine') {
+                console.log('Only approximate location permission granted');
+                return 'limited';
+            }
+        } catch (error) {
+            console.error('Error checking precise location permission:', error);
+        }
+    }
+
+    return 'granted';
+};
+
+export const getCurrentLocation = async (): Promise<LocationType> => {
+    // Check location permission with precision info
+    const permissionStatus = await checkPreciseLocationPermission();
+
+    if (permissionStatus === 'denied') {
+        throw new Error(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
+    }
+
+    try {
+        let location;
+
+        // Use different accuracy settings based on permission level
+        if (permissionStatus === 'limited' && Platform.OS === 'android') {
+            console.log('Using lower accuracy for location due to permission limitations');
+            // If we only have approximate location, use a lower accuracy setting
+            location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Low
+            });
+
+            // Add a console warning about reduced accuracy
+            console.warn(LOCATION_PRECISION_WARNINGS.IMPRECISE_LOCATION);
+        } else {
+            // Normal flow with precise location permission
+            location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced
+            });
+        }
+
+        return {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+        };
+    } catch (error) {
+        console.error('Error getting current location:', error);
+        throw new Error(ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
+    }
+};
 
 interface GoogleGeocodingResponse {
     results: {
@@ -71,30 +150,6 @@ interface GooglePlacesResponse {
     }[];
     status: string;
 }
-
-export const getCurrentLocation = async (): Promise<LocationType> => {
-    // Request permission to access location
-    const { status } = await Location.requestForegroundPermissionsAsync();
-
-    if (status !== 'granted') {
-        throw new Error(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
-    }
-
-    try {
-        // Get the current location
-        const location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced
-        });
-
-        return {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-        };
-    } catch (error) {
-        console.error('Error getting current location:', error);
-        throw new Error(ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
-    }
-};
 
 export const geocodeAddress = async (address: string): Promise<LocationType> => {
     try {

@@ -176,4 +176,38 @@ export const styles = StyleSheet.create({
     scrollViewContent: {
         flexGrow: 1,
     },
+    permissionMessageContainer: {
+        marginBottom: 16,
+        padding: 8,
+    },
+    permissionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: COLORS.TEXT,
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    permissionText: {
+        fontSize: 14,
+        color: COLORS.TEXT,
+        marginBottom: 12,
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    warningBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF9C4',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+        borderWidth: 1,
+        borderColor: '#FFD600',
+    },
+    warningText: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 13,
+        color: '#5D4037',
+    },
 }); 

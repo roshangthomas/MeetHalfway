@@ -34,4 +34,6 @@ export const ERROR_MESSAGES = {
     NETWORK_ERROR: 'Network error. Please check your internet connection.',
     ROUTE_NOT_FOUND: 'Could not find a route between the two locations.',
     DIRECTIONS_FAILED: 'Failed to get directions between locations.',
+    LOCATION_PERMISSION_DENIED: 'Location permission was denied. Please enable location services to use this feature or set your location manually.',
+    LOCATION_PRECISION_LIMITED: 'Using approximate location. For better accuracy, enable precise location in settings.',
 }; 
