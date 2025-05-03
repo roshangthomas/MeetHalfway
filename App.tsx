@@ -63,6 +63,15 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const partnerLocationInputRef = useRef<View>(null);
 
+  // Add a mounted ref to avoid state updates after unmount
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Check for new location passed from ChangeLocation screen
   useEffect(() => {
     if (route.params?.newLocation && route.params?.newAddress) {
@@ -93,34 +102,44 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
   }, [userLocation, mapRegion]);
 
   useEffect(() => {
-    // Check if location services are enabled when component mounts
-    const checkLocationServices = async () => {
+    // Use a separate effect for initial location setup that runs
+    // only after the component is fully rendered
+    const initializeLocation = async () => {
       // If we already have a location from params or userAddress is set, skip location services check
       if ((route.params?.newLocation && route.params?.newAddress) || userAddress) {
         return;
       }
 
-      const enabled = await ExpoLocation.hasServicesEnabledAsync();
-      setLocationServicesEnabled(enabled);
+      try {
+        // Check if location services are enabled
+        const enabled = await ExpoLocation.hasServicesEnabledAsync();
 
-      if (!enabled) {
-        // If location services are disabled, set the appropriate permission state
-        setLocationPermission('denied');
-        // Navigate to LocationPermission screen
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'LocationPermission' }],
-        });
-      } else {
-        // Only request location if services are enabled
-        getUserLocation();
+        if (!isMountedRef.current) return;
+        setLocationServicesEnabled(enabled);
+
+        if (!enabled) {
+          // If location services are disabled, set the appropriate permission state
+          setLocationPermission('denied');
+          // Navigate to LocationPermission screen
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'LocationPermission' }],
+          });
+          return;
+        }
+
+        // Begin getting user location, this will show a loading indicator
+        await getUserLocation();
+      } catch (error) {
+        if (!isMountedRef.current) return;
+        console.error('Failed to initialize location:', error);
       }
     };
 
-    // Add a small delay before checking location services to prioritize UI rendering
+    // Use a setTimeout to delay location initialization after initial render
     const timerId = setTimeout(() => {
-      checkLocationServices();
-    }, 100);
+      initializeLocation();
+    }, 500);
 
     return () => clearTimeout(timerId);
   }, [navigation, route.params?.newLocation, route.params?.newAddress, userAddress]);
@@ -136,6 +155,7 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
     try {
       // First check the precise location permission status
       const permissionStatus = await checkPreciseLocationPermission();
+      if (!isMountedRef.current) return;
       setLocationPermission(permissionStatus);
 
       if (permissionStatus === 'denied') {
@@ -149,6 +169,7 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
 
       // Call getCurrentLocation which now handles both precise and approximate permissions
       const location = await getCurrentLocation();
+      if (!isMountedRef.current) return;
       setUserLocation(location);
       setMapRegion({
         latitude: location.latitude,
@@ -160,6 +181,7 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
       // Set error to null as we successfully got location (even if approximate)
       setError(null);
     } catch (error) {
+      if (!isMountedRef.current) return;
       console.error('Failed to get user location:', error);
       if (error instanceof Error &&
         error.message === ERROR_MESSAGES.LOCATION_PERMISSION_DENIED) {
@@ -178,7 +200,9 @@ function HomeScreen({ navigation, route }: HomeScreenProps) {
         setError(error instanceof Error ? error.message : ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
       }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -845,6 +869,7 @@ export default function App() {
         await SplashScreen.preventAutoHideAsync();
 
         // Set app as ready immediately without delay
+        // Don't do any other heavy work here to speed up initial render
         setAppIsReady(true);
       } catch (e) {
         console.warn(e);
@@ -918,12 +943,12 @@ export default function App() {
         </ErrorBoundary>
       </NavigationContainer>
 
-      {/* Show animated splash with reduced duration */}
+      {/* Show animated splash with significantly reduced duration */}
       {showSplash && (
         <AnimatedSplash
           message="Getting everything ready..."
           onAnimationFinish={handleSplashFinish}
-          duration={1000}
+          duration={300}
         />
       )}
     </>
