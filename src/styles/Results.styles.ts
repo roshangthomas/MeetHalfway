@@ -41,7 +41,7 @@ export const styles = StyleSheet.create({
     sortIconBox: {
         width: 36,
         height: 36,
-        backgroundColor: '#EEEEEE',
+        backgroundColor: COLORS.SKELETON,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
@@ -71,7 +71,7 @@ export const styles = StyleSheet.create({
         borderRadius: 8,
         marginVertical: 16,
         marginHorizontal: 16,
-        shadowColor: '#000',
+        shadowColor: COLORS.BLACK,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,

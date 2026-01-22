@@ -23,12 +23,14 @@ interface RestaurantListProps {
     travelMode?: TravelMode;
 }
 
-const RestaurantCard: React.FC<{
+const CARD_HEIGHT = 380;
+
+const RestaurantCard = React.memo<{
     restaurant: Restaurant,
     userLocation: Location,
     partnerLocation?: Location,
     travelMode?: TravelMode
-}> = ({
+}>(({
     restaurant,
     userLocation,
     partnerLocation,
@@ -164,7 +166,9 @@ const RestaurantCard: React.FC<{
                 </View>
             </TouchableOpacity>
         );
-    };
+});
+
+RestaurantCard.displayName = 'RestaurantCard';
 
 export const RestaurantList: React.FC<RestaurantListProps> = ({
     restaurants,
@@ -172,20 +176,33 @@ export const RestaurantList: React.FC<RestaurantListProps> = ({
     partnerLocation,
     travelMode
 }) => {
+    const renderItem = React.useCallback(({ item }: { item: Restaurant }) => (
+        <RestaurantCard
+            restaurant={item}
+            userLocation={userLocation}
+            partnerLocation={partnerLocation}
+            travelMode={travelMode}
+        />
+    ), [userLocation, partnerLocation, travelMode]);
+
+    const getItemLayout = React.useCallback((_: unknown, index: number) => ({
+        length: CARD_HEIGHT,
+        offset: CARD_HEIGHT * index,
+        index,
+    }), []);
+
     return (
         <FlatList
             data={restaurants}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-                <RestaurantCard
-                    restaurant={item}
-                    userLocation={userLocation}
-                    partnerLocation={partnerLocation}
-                    travelMode={travelMode}
-                />
-            )}
+            renderItem={renderItem}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            windowSize={5}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            removeClippedSubviews={true}
+            getItemLayout={getItemLayout}
         />
     );
 };

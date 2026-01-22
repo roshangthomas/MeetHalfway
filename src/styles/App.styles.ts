@@ -197,17 +197,17 @@ export const styles = StyleSheet.create({
     warningBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF9C4',
+        backgroundColor: COLORS.WARNING_BANNER_BG,
         padding: 10,
         borderRadius: 8,
         marginBottom: 15,
         borderWidth: 1,
-        borderColor: '#FFD600',
+        borderColor: COLORS.WARNING_BANNER_BORDER,
     },
     warningText: {
         flex: 1,
         marginLeft: 8,
         fontSize: 13,
-        color: '#5D4037',
+        color: COLORS.WARNING_BANNER_TEXT,
     },
 }); 

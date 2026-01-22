@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView, SafeAreaView, Text, TouchableOpacity, ActivityIndicator, FlatList, Image } from 'react-native';
+import { View, SafeAreaView, Text, TouchableOpacity } from 'react-native';
 import { RestaurantList } from '../components/RestaurantList';
-import { Restaurant, Location, TravelMode, SortOption, RootStackParamList } from '../types';
+import { SortOption, RootStackParamList } from '../types';
 import { styles } from '../styles/Results.styles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS } from '../constants/colors';
@@ -11,6 +11,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { AntDesign } from '@expo/vector-icons';
 import { SortModal } from '../components/SortModal';
 import * as Font from 'expo-font';
+import { parseDurationToMinutes } from '../utils/duration';
 
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
@@ -25,25 +26,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         minReviews: 0,
         maxPrice: 4,
     });
-
-    // Helper function to convert duration strings like "15 mins" to minutes
-    const convertDurationToMinutes = (duration: string): number => {
-        if (!duration || duration === 'Unknown') return 0;
-
-        // Extract numbers from the duration text
-        const matches = duration.match(/(\d+)/g);
-        if (!matches) return 0;
-
-        if (duration.includes('hour') || duration.includes('hr')) {
-            // Handle hours and minutes format (e.g., "1 hour 20 mins")
-            const hours = parseInt(matches[0], 10) || 0;
-            const minutes = matches.length > 1 ? parseInt(matches[1], 10) : 0;
-            return (hours * 60) + minutes;
-        } else {
-            // Handle minutes only format (e.g., "20 mins")
-            return parseInt(matches[0], 10) || 0;
-        }
-    };
 
     // Load fonts
     useEffect(() => {
@@ -88,12 +70,12 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                     return (a.priceLevel || 0) - (b.priceLevel || 0);
                 case 'travelTimeDiff':
                     // Calculate travel time difference for sorting
-                    const aUserTime = a.durationA ? convertDurationToMinutes(a.durationA) : 0;
-                    const aFriendTime = a.durationB ? convertDurationToMinutes(a.durationB) : 0;
+                    const aUserTime = a.durationA ? parseDurationToMinutes(a.durationA) : 0;
+                    const aFriendTime = a.durationB ? parseDurationToMinutes(a.durationB) : 0;
                     const aDiff = Math.abs(aUserTime - aFriendTime);
 
-                    const bUserTime = b.durationA ? convertDurationToMinutes(b.durationA) : 0;
-                    const bFriendTime = b.durationB ? convertDurationToMinutes(b.durationB) : 0;
+                    const bUserTime = b.durationA ? parseDurationToMinutes(b.durationA) : 0;
+                    const bFriendTime = b.durationB ? parseDurationToMinutes(b.durationB) : 0;
                     const bDiff = Math.abs(bUserTime - bFriendTime);
 
                     return aDiff - bDiff;
