@@ -2,19 +2,22 @@ import React from 'react';
 import {
     View,
     Text,
-    Image,
     StyleSheet,
     FlatList,
-    Dimensions,
     Platform,
     TouchableOpacity,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Restaurant, Location, TravelMode } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 import { FontAwesome } from '@expo/vector-icons';
+import { getPriceLevelDisplay } from '../utils';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { RatingDisplay } from './RatingDisplay';
+
+// Placeholder image for restaurants without photos
+const placeholderImage = require('../../assets/placeholder-restaurant.png');
 
 interface RestaurantListProps {
     restaurants: Restaurant[];
@@ -39,12 +42,13 @@ const RestaurantCard = React.memo<{
         const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
         const renderPriceLevel = (priceLevel?: number) => {
-            if (!priceLevel) return null;
+            const { filled, unfilled } = getPriceLevelDisplay(priceLevel);
+            if (!filled) return null;
             return (
                 <Text style={styles.priceLevel}>
-                    {'$'.repeat(priceLevel)}
+                    {filled}
                     <Text style={styles.priceLevelGray}>
-                        {'$'.repeat(4 - priceLevel)}
+                        {unfilled}
                     </Text>
                 </Text>
             );
@@ -88,13 +92,12 @@ const RestaurantCard = React.memo<{
                 activeOpacity={0.7}
             >
                 <Image
-                    source={
-                        restaurant.photoUrl
-                            ? { uri: restaurant.photoUrl }
-                            : require('../../assets/placeholder-restaurant.png')
-                    }
+                    source={restaurant.photoUrl ? { uri: restaurant.photoUrl } : placeholderImage}
                     style={styles.image}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    transition={200}
+                    placeholder={placeholderImage}
+                    cachePolicy="disk"
                 />
                 {renderFairnessBadge()}
                 <View style={styles.contentContainer}>
@@ -114,9 +117,7 @@ const RestaurantCard = React.memo<{
                         </Text>
                     )}
 
-                    {/* Travel info section */}
                     <View style={styles.travelInfoContainer}>
-                        {/* Your travel info */}
                         <View style={styles.travelInfoColumn}>
                             <Text style={styles.travelInfoLabel}>Your Travel:</Text>
                             {restaurant.durationA ? (
@@ -144,7 +145,6 @@ const RestaurantCard = React.memo<{
                             ) : null}
                         </View>
 
-                        {/* Partner travel info - only show if we have partner location */}
                         {partnerLocation && (
                             <View style={styles.travelInfoColumn}>
                                 <Text style={styles.travelInfoLabel}>Partner Travel:</Text>

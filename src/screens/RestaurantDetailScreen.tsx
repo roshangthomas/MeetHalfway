@@ -1,11 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Share, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { FontAwesome } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
-import { Restaurant, Location, TravelMode } from '../types';
+import { COLORS } from '../constants';
+import { Restaurant, TravelMode } from '../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { getPlaceDetails } from '../services/places';
+import {
+    logger,
+    getPriceLevelDisplay,
+    isBusinessOpen,
+    getGoogleDayIndex,
+    getDirectionsUrl,
+    getShareUrl,
+    getShareMessage,
+} from '../utils';
+
+// Placeholder image for restaurants without photos
+const placeholderImage = require('../../assets/placeholder-restaurant.png');
 
 type RestaurantDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
 
@@ -14,7 +27,6 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
     const [detailedRestaurant, setDetailedRestaurant] = useState<Restaurant>(restaurant);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Fetch place details when the component mounts
     useEffect(() => {
         const fetchPlaceDetails = async () => {
             try {
@@ -26,7 +38,7 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                     businessHours: details.businessHours
                 });
             } catch (error) {
-                console.error('Failed to fetch place details:', error);
+                logger.error('Failed to fetch place details:', error);
             } finally {
                 setIsLoading(false);
             }
@@ -63,78 +75,49 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
     };
 
     const renderPriceLevel = (priceLevel?: number) => {
-        if (!priceLevel) return null;
+        const { filled, unfilled } = getPriceLevelDisplay(priceLevel);
+        if (!filled) return null;
         return (
             <Text style={styles.priceLevel}>
-                {'$'.repeat(priceLevel)}
+                {filled}
                 <Text style={styles.priceLevelGray}>
-                    {'$'.repeat(4 - priceLevel)}
+                    {unfilled}
                 </Text>
             </Text>
         );
     };
 
-    const getDirections = () => {
-        const destination = `${restaurant.latitude},${restaurant.longitude}`;
+    const handleGetDirections = () => {
+        const url = getDirectionsUrl(
+            userLocation,
+            { latitude: restaurant.latitude, longitude: restaurant.longitude },
+            travelMode,
+            restaurant.id
+        );
 
-        let url;
-        if (Platform.OS === 'ios') {
-            // Use alternative Apple Maps URL scheme for better control of transport mode
-            if (travelMode === 'driving') {
-                // Specific format for driving directions
-                url = `http://maps.apple.com/?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=d`;
-            } else {
-                // Format for other travel modes
-                const dirFlag = getAppleMapsDirectionFlag(travelMode);
-                url = `http://maps.apple.com/?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=${dirFlag}`;
-            }
-        } else {
-            // Use the Google Maps directions URL to show preview instead of starting navigation directly
-            url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${destination}&travelmode=${travelMode}`;
-
-            // Optional: Add restaurant place ID for better location pinpointing
-            if (restaurant.id) {
-                url += `&destination_place_id=${restaurant.id}`;
-            }
-        }
-
-        if (url) {
-            console.log(`Opening maps with URL: ${url}, travel mode: ${travelMode}`);
-            Linking.openURL(url).catch(err =>
-                console.error('An error occurred while opening maps', err)
-            );
-        }
+        logger.info(`Opening maps with URL: ${url}, travel mode: ${travelMode}`);
+        Linking.openURL(url).catch(err =>
+            logger.error('An error occurred while opening maps', err)
+        );
     };
 
-    const getAppleMapsDirectionFlag = (mode: TravelMode): string => {
-        switch (mode) {
-            case 'walking':
-                return 'w';
-            case 'transit':
-                return 'r';
-            case 'bicycling':
-                return 'b';
-            case 'driving':
-            default:
-                return 'd';
-        }
-    };
-
-    const shareLocation = async () => {
+    const handleShareLocation = async () => {
         try {
-            const restaurantLocation = `${restaurant.latitude},${restaurant.longitude}`;
-            const mapsUrl = Platform.select({
-                ios: `https://maps.apple.com/?q=${restaurant.name}&ll=${restaurantLocation}`,
-                android: `https://www.google.com/maps/search/?api=1&query=${restaurantLocation}&query_place_id=${restaurant.id}`
-            });
+            const mapsUrl = getShareUrl(
+                restaurant.name,
+                { latitude: restaurant.latitude, longitude: restaurant.longitude },
+                restaurant.id
+            );
+
+            const message = getShareMessage(restaurant.name, restaurant.address, mapsUrl);
 
             await Share.share({
-                message: `Check out ${restaurant.name} at ${restaurant.address || 'this location'}. ${mapsUrl}`,
+                message,
                 url: mapsUrl, // iOS only
                 title: `${restaurant.name} Location` // Android only
             });
         } catch (error) {
-            console.error('Error sharing location:', error);
+            logger.error('Error sharing location:', error);
         }
     };
 
@@ -144,23 +127,18 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         }
     };
 
-    // Add a function to format and parse business hours
     const renderBusinessHours = () => {
         if (!detailedRestaurant.businessHours || detailedRestaurant.businessHours.length === 0) {
             return null;
         }
 
-        // Get current day of week (0 = Sunday, 1 = Monday, etc.)
-        const today = new Date().getDay();
-        // Convert to Google's format (0 = Monday, 6 = Sunday)
-        const googleToday = today === 0 ? 6 : today - 1;
+        const googleToday = getGoogleDayIndex(new Date().getDay());
 
         return (
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Business Hours</Text>
                 <View style={styles.hoursContainer}>
                     {detailedRestaurant.businessHours.map((hourString, index) => {
-                        // Split the day and hours (e.g., "Monday: 9:00 AM – 10:00 PM")
                         const [day, hours] = hourString.split(': ');
                         const isToday = index === googleToday;
 
@@ -192,65 +170,11 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         );
     };
 
-    // Function to determine if restaurant is currently open
-    const isRestaurantOpen = (): boolean | null => {
-        if (!detailedRestaurant.businessHours || detailedRestaurant.businessHours.length === 0) {
-            return null; // Unknown status
-        }
-
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        // Convert to Google's format (0 = Monday, 6 = Sunday)
-        const googleDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-        // Get hours for today
-        const todayHours = detailedRestaurant.businessHours[googleDayIndex];
-        if (!todayHours || todayHours.includes('Closed')) {
-            return false; // Closed today
-        }
-
-        // Parse hours (e.g., "Monday: 9:00 AM – 10:00 PM")
-        const hoursMatch = todayHours.match(/(\d+:\d+\s*(?:AM|PM))\s*–\s*(\d+:\d+\s*(?:AM|PM))/i);
-        if (!hoursMatch) {
-            return null; // Can't determine
-        }
-
-        const [_, openTime, closeTime] = hoursMatch;
-
-        // Convert current time, open time, and close time to minutes since midnight
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const openMinutes = convertTimeToMinutes(openTime);
-        const closeMinutes = convertTimeToMinutes(closeTime);
-
-        return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
-    };
-
-    // Helper to convert time string to minutes since midnight
-    const convertTimeToMinutes = (timeStr: string): number => {
-        // Clean up the time string
-        const cleanTimeStr = timeStr.trim().toUpperCase();
-
-        // Parse hours and minutes
-        const [hourMin, period] = cleanTimeStr.split(/\s+/);
-        const [hours, minutes] = hourMin.split(':').map(Number);
-
-        // Convert to 24-hour format
-        let totalHours = hours;
-        if (period === 'PM' && hours < 12) {
-            totalHours += 12;
-        } else if (period === 'AM' && hours === 12) {
-            totalHours = 0;
-        }
-
-        return totalHours * 60 + minutes;
-    };
-
-    // Render open/closed status badge
     const renderOpenStatusBadge = () => {
-        const openStatus = isRestaurantOpen();
+        const openStatus = isBusinessOpen(detailedRestaurant.businessHours);
 
         if (openStatus === null) {
-            return null; // Don't show if we can't determine
+            return null;
         }
 
         return (
@@ -272,13 +196,12 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         <SafeAreaView style={styles.container}>
             <ScrollView style={styles.scrollView}>
                 <Image
-                    source={
-                        detailedRestaurant.photoUrl
-                            ? { uri: detailedRestaurant.photoUrl }
-                            : require('../../assets/placeholder-restaurant.png')
-                    }
+                    source={detailedRestaurant.photoUrl ? { uri: detailedRestaurant.photoUrl } : placeholderImage}
                     style={styles.heroImage}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    transition={300}
+                    placeholder={placeholderImage}
+                    cachePolicy="disk"
                 />
 
                 <View style={styles.content}>
@@ -351,7 +274,7 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
 
                     <TouchableOpacity
                         style={styles.shareButton}
-                        onPress={shareLocation}
+                        onPress={handleShareLocation}
                     >
                         <FontAwesome name="share-alt" size={18} color={COLORS.SURFACE} />
                         <Text style={styles.buttonText}>Share Location</Text>
@@ -359,7 +282,7 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
 
                     <TouchableOpacity
                         style={styles.directionsButton}
-                        onPress={getDirections}
+                        onPress={handleGetDirections}
                     >
                         <FontAwesome name="map" size={18} color={COLORS.SURFACE} />
                         <Text style={styles.buttonText}>Get Directions</Text>
@@ -550,19 +473,19 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     openBadge: {
-        backgroundColor: 'rgba(39, 174, 96, 0.2)', // Light green background
+        backgroundColor: COLORS.OPEN_BG,
     },
     closedBadge: {
-        backgroundColor: 'rgba(231, 76, 60, 0.2)', // Light red background
+        backgroundColor: COLORS.CLOSED_BG,
     },
     statusText: {
         fontWeight: '600',
         fontSize: 14,
     },
     openText: {
-        color: '#27AE60', // Green text
+        color: COLORS.OPEN_TEXT,
     },
     closedText: {
-        color: '#E74C3C', // Red text
+        color: COLORS.CLOSED_TEXT,
     },
 }); 

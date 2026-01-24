@@ -1,29 +1,21 @@
 import * as Location from 'expo-location';
-import axios from 'axios';
 import { GOOGLE_MAPS_API_KEY } from '@env';
-import { Location as LocationType } from '../types';
-import { ERROR_MESSAGES } from '../constants/index';
-import { PlaceCategory, Restaurant, TravelMode } from '../types';
+import { Location as LocationType, PlaceCategory, Restaurant, TravelMode } from '../types';
+import { ERROR_MESSAGES, SEARCH_RADIUS, MAX_RESULTS } from '../constants';
 import { Platform } from 'react-native';
 import {
     GoogleGeocodingResponse,
     GoogleDirectionsResponse,
     GooglePlacesResponse,
     GooglePlaceResult,
-    TravelInfo,
 } from '../types/api';
-import { parseDurationToMinutes } from '../utils/duration';
-import { logger } from '../utils/logger';
-
-interface AxiosErrorLike {
-    isAxiosError: boolean;
-    response?: { data?: unknown };
-    request?: unknown;
-}
-
-const isAxiosError = (error: unknown): error is AxiosErrorLike => {
-    return error !== null && typeof error === 'object' && 'isAxiosError' in error;
-};
+import { logger, isKnownErrorMessage } from '../utils';
+import { googleMapsClient, ENDPOINTS, CACHE_TTL } from '../api/client';
+import {
+    getBatchTravelInfo,
+    VenueLocation,
+    BatchTravelResult,
+} from './distanceMatrix';
 
 export type LocationPermissionStatus = 'granted' | 'denied' | 'limited' | 'pending';
 
@@ -57,10 +49,6 @@ export const checkPreciseLocationPermission = async (): Promise<LocationPermissi
     return 'granted';
 };
 
-/**
- * Get the last known location instantly (cached by the OS).
- * Returns null if no cached location is available.
- */
 export const getLastKnownLocation = async (): Promise<LocationType | null> => {
     try {
         const lastKnown = await Location.getLastKnownPositionAsync();
@@ -77,16 +65,10 @@ export const getLastKnownLocation = async (): Promise<LocationType | null> => {
     }
 };
 
-/**
- * Get the current GPS location.
- * @param preCheckedPermission - Optional pre-checked permission status to avoid duplicate checks
- * @param preferCached - If true, returns cached location first if available (faster cold start)
- */
 export const getCurrentLocation = async (
     preCheckedPermission?: LocationPermissionStatus,
     preferCached: boolean = false
 ): Promise<LocationType> => {
-    // Use pre-checked permission if provided, otherwise check it
     const permissionStatus = preCheckedPermission ?? await checkPreciseLocationPermission();
 
     if (permissionStatus === 'denied') {
@@ -94,7 +76,6 @@ export const getCurrentLocation = async (
     }
 
     try {
-        // Try cached location first for faster cold start
         if (preferCached) {
             const cachedLocation = await getLastKnownLocation();
             if (cachedLocation) {
@@ -128,46 +109,34 @@ export const getCurrentLocation = async (
 
 export const geocodeAddress = async (address: string): Promise<LocationType> => {
     try {
-        const response = await axios.get<GoogleGeocodingResponse>(
-            `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-                address
-            )}&key=${GOOGLE_MAPS_API_KEY}`
+        const response = await googleMapsClient.get<GoogleGeocodingResponse>(
+            ENDPOINTS.geocode,
+            { address: encodeURIComponent(address) },
+            { cacheTTL: CACHE_TTL.GEOCODE }
         );
 
-        if (response.data.status === 'ZERO_RESULTS') {
+        if (response.status === 'ZERO_RESULTS') {
             throw new Error(ERROR_MESSAGES.PARTNER_LOCATION_INVALID);
         }
 
-        if (response.data.status === 'REQUEST_DENIED') {
+        if (response.status === 'REQUEST_DENIED') {
             throw new Error(ERROR_MESSAGES.API_KEY_INVALID);
         }
 
-        if (response.data.status === 'OVER_QUERY_LIMIT') {
+        if (response.status === 'OVER_QUERY_LIMIT') {
             throw new Error(ERROR_MESSAGES.API_QUOTA_EXCEEDED);
         }
 
-        if (response.data.status !== 'OK' || response.data.results.length === 0) {
+        if (response.status !== 'OK' || response.results.length === 0) {
             throw new Error(ERROR_MESSAGES.GEOCODING_FAILED);
         }
 
-        const { lat, lng } = response.data.results[0].geometry.location;
+        const { lat, lng } = response.results[0].geometry.location;
         return { latitude: lat, longitude: lng };
     } catch (error: unknown) {
         logger.error('Geocoding error:', error);
 
-        if (isAxiosError(error)) {
-            if (!error.response && error.request) {
-                throw new Error(ERROR_MESSAGES.NETWORK_ERROR);
-            }
-        }
-
-        if (error instanceof Error &&
-            [
-                ERROR_MESSAGES.PARTNER_LOCATION_INVALID,
-                ERROR_MESSAGES.API_KEY_INVALID,
-                ERROR_MESSAGES.API_QUOTA_EXCEEDED,
-                ERROR_MESSAGES.GEOCODING_FAILED
-            ].includes(error.message)) {
+        if (error instanceof Error && isKnownErrorMessage(error.message)) {
             throw error;
         }
 
@@ -187,16 +156,21 @@ export const calculateRoadMidpoint = async (
     locationB: LocationType
 ): Promise<LocationType> => {
     try {
-        const response = await axios.get<GoogleDirectionsResponse>(
-            `https://maps.googleapis.com/maps/api/directions/json?origin=${locationA.latitude},${locationA.longitude}&destination=${locationB.latitude},${locationB.longitude}&key=${GOOGLE_MAPS_API_KEY}`
+        const response = await googleMapsClient.get<GoogleDirectionsResponse>(
+            ENDPOINTS.directions,
+            {
+                origin: `${locationA.latitude},${locationA.longitude}`,
+                destination: `${locationB.latitude},${locationB.longitude}`,
+            },
+            { cacheTTL: CACHE_TTL.DIRECTIONS }
         );
 
-        if (!response.data.routes || response.data.routes.length === 0) {
+        if (!response.routes || response.routes.length === 0) {
             logger.error('No route found between locations');
             throw new Error(ERROR_MESSAGES.ROUTE_NOT_FOUND);
         }
 
-        const route = response.data.routes[0];
+        const route = response.routes[0];
         const legs = route.legs[0];
         const steps = legs.steps;
 
@@ -234,50 +208,27 @@ export const calculateRoadMidpoint = async (
     }
 };
 
-const getTravelInfo = async (
-    origin: LocationType,
-    destination: LocationType,
-    mode: TravelMode
-): Promise<TravelInfo> => {
-    try {
-        const response = await axios.get<GoogleDirectionsResponse>(
-            `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=${mode}&key=${GOOGLE_MAPS_API_KEY}`
-        );
-
-        if (!response.data.routes || response.data.routes.length === 0) {
-            return { distance: 'Unknown', duration: 'Unknown' };
-        }
-
-        const route = response.data.routes[0].legs[0];
-        return {
-            distance: route.distance.text,
-            duration: route.duration.text,
-        };
-    } catch (error) {
-        logger.error('Error getting travel info:', error);
-        return { distance: 'Unknown', duration: 'Unknown' };
-    }
-};
-
 const searchNearbyVenues = async (
     location: LocationType,
     radius: number,
     types: string
 ): Promise<GooglePlaceResult[]> => {
     try {
-        const response = await axios.get<GooglePlacesResponse>(
-            `https://maps.googleapis.com/maps/api/place/nearbysearch/json?` +
-            `location=${location.latitude},${location.longitude}` +
-            `&radius=${radius}` +
-            `&type=${types}` +
-            `&key=${GOOGLE_MAPS_API_KEY}`
+        const response = await googleMapsClient.get<GooglePlacesResponse>(
+            ENDPOINTS.placesNearby,
+            {
+                location: `${location.latitude},${location.longitude}`,
+                radius,
+                type: types,
+            },
+            { cacheTTL: CACHE_TTL.PLACES_NEARBY }
         );
 
-        if (response.data.status !== 'OK' || !response.data.results) {
+        if (response.status !== 'OK' || !response.results) {
             return [];
         }
 
-        return response.data.results;
+        return response.results;
     } catch (error) {
         logger.error('Error searching for nearby venues:', error);
         return [];
@@ -304,15 +255,21 @@ export const findOptimalMeetingPlaces = async (
 
         for (const category of categories) {
             try {
-                const response = await axios.get<GooglePlacesResponse>(
-                    `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${midpoint.latitude},${midpoint.longitude}&radius=1500&type=${category}&key=${GOOGLE_MAPS_API_KEY}`
+                const response = await googleMapsClient.get<GooglePlacesResponse>(
+                    ENDPOINTS.placesNearby,
+                    {
+                        location: `${midpoint.latitude},${midpoint.longitude}`,
+                        radius: SEARCH_RADIUS.DEFAULT,
+                        type: category,
+                    },
+                    { cacheTTL: CACHE_TTL.PLACES_NEARBY }
                 );
 
-                if (!response.data.results || response.data.results.length === 0) {
+                if (!response.results || response.results.length === 0) {
                     continue;
                 }
 
-                const venues: Restaurant[] = response.data.results.map((place) => ({
+                const venues: Restaurant[] = response.results.map((place) => ({
                     id: place.place_id,
                     name: place.name,
                     rating: place.rating || 0,
@@ -320,7 +277,7 @@ export const findOptimalMeetingPlaces = async (
                     latitude: place.geometry.location.lat,
                     longitude: place.geometry.location.lng,
                     photoUrl: place.photos?.[0]
-                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_MAPS_API_KEY}`
+                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=200&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_MAPS_API_KEY}`
                         : undefined,
                     totalRatings: place.user_ratings_total || 0,
                     priceLevel: place.price_level || 0,
@@ -341,63 +298,69 @@ export const findOptimalMeetingPlaces = async (
             throw new Error('No venues found near the midpoint');
         }
 
-        const venuesWithTravelInfo = await Promise.all(
-            allVenues.map(async (venue) => {
-                try {
-                    const venueLocation: LocationType = {
-                        latitude: venue.latitude,
-                        longitude: venue.longitude
-                    };
+        const venueLocations: VenueLocation[] = allVenues.map((venue) => ({
+            id: venue.id,
+            latitude: venue.latitude,
+            longitude: venue.longitude,
+        }));
 
-                    const travelInfoA = await getTravelInfo(locationA, venueLocation, travelMode);
-                    const travelInfoB = await getTravelInfo(locationB, venueLocation, travelMode);
-
-                    const travelTimeA = parseDurationToMinutes(travelInfoA.duration);
-                    const travelTimeB = parseDurationToMinutes(travelInfoB.duration);
-
-                    const timeDifference = Math.abs(travelTimeA - travelTimeB);
-
-                    const fairnessScore = 100 - Math.min(timeDifference, 100);
-                    const ratingScore = (venue.rating || 3) * 20;
-                    const totalTimeScore = 100 - Math.min((travelTimeA + travelTimeB) / 2, 100);
-
-                    const score = (fairnessScore * 0.5) + (ratingScore * 0.3) + (totalTimeScore * 0.2);
-
-                    return {
-                        ...venue,
-                        travelTimeA,
-                        travelTimeB,
-                        timeDifference,
-                        totalTravelTime: travelTimeA + travelTimeB,
-                        fairnessScore,
-                        score,
-                        distanceA: travelInfoA.distance,
-                        durationA: travelInfoA.duration,
-                        distanceB: travelInfoB.distance,
-                        durationB: travelInfoB.duration,
-                        distance: travelInfoA.distance,
-                        duration: travelInfoA.duration,
-                    };
-                } catch (error) {
-                    logger.error(`Error calculating travel info for ${venue.name}:`, error);
-                    return {
-                        ...venue,
-                        travelTimeA: 9999,
-                        travelTimeB: 9999,
-                        timeDifference: 9999,
-                        totalTravelTime: 9999,
-                        fairnessScore: 0,
-                        score: 0,
-                        distanceA: 'Unknown',
-                        durationA: 'Unknown',
-                        distanceB: 'Unknown',
-                        durationB: 'Unknown',
-                        distance: 'Unknown',
-                        duration: 'Unknown',
-                    };
-                }
-            })
+        logger.info(`Fetching batch travel info for ${venueLocations.length} venues`);
+        const travelResults = await getBatchTravelInfo(
+            locationA,
+            locationB,
+            venueLocations,
+            travelMode
         );
+
+        const travelMap = new Map<string, BatchTravelResult>();
+        travelResults.forEach((result) => {
+            travelMap.set(result.venueId, result);
+        });
+
+        const venuesWithTravelInfo = allVenues.map((venue) => {
+            const travel = travelMap.get(venue.id);
+
+            if (!travel) {
+                return {
+                    ...venue,
+                    travelTimeA: 9999,
+                    travelTimeB: 9999,
+                    timeDifference: 9999,
+                    totalTravelTime: 9999,
+                    fairnessScore: 0,
+                    score: 0,
+                    distanceA: 'Unknown',
+                    durationA: 'Unknown',
+                    distanceB: 'Unknown',
+                    durationB: 'Unknown',
+                    distance: 'Unknown',
+                    duration: 'Unknown',
+                };
+            }
+
+            const timeDifference = Math.abs(travel.travelTimeA - travel.travelTimeB);
+            const fairnessScore = 100 - Math.min(timeDifference, 100);
+            const ratingScore = (venue.rating || 3) * 20;
+            const totalTimeScore = 100 - Math.min((travel.travelTimeA + travel.travelTimeB) / 2, 100);
+
+            const score = (fairnessScore * 0.5) + (ratingScore * 0.3) + (totalTimeScore * 0.2);
+
+            return {
+                ...venue,
+                travelTimeA: travel.travelTimeA,
+                travelTimeB: travel.travelTimeB,
+                timeDifference,
+                totalTravelTime: travel.travelTimeA + travel.travelTimeB,
+                fairnessScore,
+                score,
+                distanceA: travel.distanceA,
+                durationA: travel.durationA,
+                distanceB: travel.distanceB,
+                durationB: travel.durationB,
+                distance: travel.distanceA,
+                duration: travel.durationA,
+            };
+        });
 
         venuesWithTravelInfo.sort((a, b) => b.score - a.score);
 
@@ -428,7 +391,7 @@ export const findPracticalMidpoint = async (
         ].join('|');
 
         let venues: GooglePlaceResult[] = [];
-        const searchRadii = [500, 1500, 3000, 5000, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000];
+        const searchRadii = SEARCH_RADIUS.EXPANDED;
 
         for (const radius of searchRadii) {
             venues = await searchNearbyVenues(roadMidpoint, radius, venueTypes);
@@ -441,48 +404,56 @@ export const findPracticalMidpoint = async (
             return roadMidpoint;
         }
 
-        const scoredVenues = await Promise.all(
-            venues.map(async (venue) => {
-                const venueLocation: LocationType = {
-                    latitude: venue.geometry.location.lat,
-                    longitude: venue.geometry.location.lng
-                };
+        const limitedVenues = venues.slice(0, MAX_RESULTS.VENUES_FOR_MIDPOINT);
 
-                const travelInfoA = await getTravelInfo(locationA, venueLocation, travelMode);
-                const travelInfoB = await getTravelInfo(locationB, venueLocation, travelMode);
+        const venueLocations: VenueLocation[] = limitedVenues.map((venue) => ({
+            id: venue.place_id,
+            latitude: venue.geometry.location.lat,
+            longitude: venue.geometry.location.lng,
+        }));
 
-                const travelTimeA = parseDurationToMinutes(travelInfoA.duration);
-                const travelTimeB = parseDurationToMinutes(travelInfoB.duration);
-
-                const timeDifference = Math.abs(travelTimeA - travelTimeB);
-                const totalTravelTime = travelTimeA + travelTimeB;
-
-                const rating = venue.rating || 3;
-                const userRatingsTotal = venue.user_ratings_total || 0;
-
-                const isOnMajorRoad = venue.types?.some((type: string) =>
-                    ['route', 'street_address', 'point_of_interest'].includes(type)
-                ) || false;
-
-                const fairnessScore = 100 - Math.min(timeDifference, 100);
-                const travelTimeScore = 100 - Math.min(totalTravelTime / 2, 100);
-                const qualityScore = Math.min((rating * 20) * (Math.min(userRatingsTotal, 100) / 100), 100);
-                const accessibilityScore = isOnMajorRoad ? 100 : 50;
-
-                const totalScore = (
-                    (fairnessScore * 0.35) +
-                    (travelTimeScore * 0.30) +
-                    (qualityScore * 0.25) +
-                    (accessibilityScore * 0.10)
-                );
-
-                return {
-                    location: venueLocation,
-                    name: venue.name,
-                    score: totalScore,
-                };
-            })
+        const travelResults = await getBatchTravelInfo(
+            locationA,
+            locationB,
+            venueLocations,
+            travelMode
         );
+
+        const scoredVenues = limitedVenues.map((venue, index) => {
+            const travel = travelResults[index];
+            const venueLocation: LocationType = {
+                latitude: venue.geometry.location.lat,
+                longitude: venue.geometry.location.lng,
+            };
+
+            const timeDifference = Math.abs(travel.travelTimeA - travel.travelTimeB);
+            const totalTravelTime = travel.travelTimeA + travel.travelTimeB;
+
+            const rating = venue.rating || 3;
+            const userRatingsTotal = venue.user_ratings_total || 0;
+
+            const isOnMajorRoad = venue.types?.some((type: string) =>
+                ['route', 'street_address', 'point_of_interest'].includes(type)
+            ) || false;
+
+            const fairnessScore = 100 - Math.min(timeDifference, 100);
+            const travelTimeScore = 100 - Math.min(totalTravelTime / 2, 100);
+            const qualityScore = Math.min((rating * 20) * (Math.min(userRatingsTotal, 100) / 100), 100);
+            const accessibilityScore = isOnMajorRoad ? 100 : 50;
+
+            const totalScore = (
+                (fairnessScore * 0.35) +
+                (travelTimeScore * 0.30) +
+                (qualityScore * 0.25) +
+                (accessibilityScore * 0.10)
+            );
+
+            return {
+                location: venueLocation,
+                name: venue.name,
+                score: totalScore,
+            };
+        });
 
         scoredVenues.sort((a, b) => b.score - a.score);
 

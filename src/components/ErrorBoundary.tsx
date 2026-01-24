@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { COLORS } from '../constants/colors';
-import { SPACING } from '../constants/index';
+import { COLORS, SPACING } from '../constants';
 import { logger } from '../utils/logger';
 
 interface Props {

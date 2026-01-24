@@ -28,16 +28,15 @@ import {
 import { searchRestaurants, getTravelInfo } from '../services/places';
 import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from '../types';
 import { styles } from '../styles/App.styles';
-import { ERROR_MESSAGES } from '../constants/index';
+import { ERROR_MESSAGES } from '../constants';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { COLORS, MAP_DELTAS } from '../constants';
 import { useLocationPermission } from '../hooks/useLocationPermission';
-import { formatAddressForDisplay } from '../utils/formatting';
-import { logger } from '../utils/logger';
+import { formatAddressForDisplay, logger } from '../utils';
 
 const { height } = Dimensions.get('window');
 
@@ -48,7 +47,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
     const [userAddress, setUserAddress] = useState<string | null>(null);
     const [userLocation, setUserLocation] = useState<Location | null>(null);
     const [loading, setLoading] = useState(false);
-    const [locationLoading, setLocationLoading] = useState(true); // Separate state for initial location fetch
+    const [locationLoading, setLocationLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [travelMode, setTravelMode] = useState<TravelMode>('driving');
     const [selectedCategories, setSelectedCategories] = useState<PlaceCategory[]>(['restaurant']);
@@ -71,8 +70,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             setMapRegion({
                 latitude: route.params.newLocation.latitude,
                 longitude: route.params.newLocation.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+                latitudeDelta: MAP_DELTAS.LATITUDE,
+                longitudeDelta: MAP_DELTAS.LONGITUDE,
             });
 
             navigation.setParams({ newLocation: undefined, newAddress: undefined });
@@ -84,8 +83,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             setMapRegion({
                 latitude: userLocation.latitude,
                 longitude: userLocation.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+                latitudeDelta: MAP_DELTAS.LATITUDE,
+                longitudeDelta: MAP_DELTAS.LONGITUDE,
             });
         }
     }, [userLocation, mapRegion]);
@@ -111,7 +110,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             }
         };
 
-        // No delay needed - start immediately for faster cold start
         checkLocationServices();
     }, [navigation, route.params?.newLocation, route.params?.newAddress, userAddress]);
 
@@ -135,45 +133,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                 throw new Error(ERROR_MESSAGES.LOCATION_PERMISSION_DENIED);
             }
 
-            // OPTIMIZATION: Try cached location first for instant UI (cold start improvement)
             const cachedLocation = await getLastKnownLocation();
             if (cachedLocation) {
-                logger.info('Using cached location for instant UI');
                 setUserLocation(cachedLocation);
                 setMapRegion({
                     latitude: cachedLocation.latitude,
                     longitude: cachedLocation.longitude,
-                    latitudeDelta: 0.0922,
-                    longitudeDelta: 0.0421,
+                    latitudeDelta: MAP_DELTAS.LATITUDE,
+                    longitudeDelta: MAP_DELTAS.LONGITUDE,
                 });
                 setLocationLoading(false);
                 setError(null);
 
-                // Fetch fresh location in background (non-blocking)
                 getCurrentLocation(status, false).then((freshLocation) => {
-                    logger.info('Updated to fresh GPS location');
                     setUserLocation(freshLocation);
                     setMapRegion({
                         latitude: freshLocation.latitude,
                         longitude: freshLocation.longitude,
-                        latitudeDelta: 0.0922,
-                        longitudeDelta: 0.0421,
+                        latitudeDelta: MAP_DELTAS.LATITUDE,
+                        longitudeDelta: MAP_DELTAS.LONGITUDE,
                     });
                 }).catch((err) => {
                     logger.warn('Background location refresh failed:', err);
-                    // Keep using cached location - no error shown to user
                 });
                 return;
             }
 
-            // No cached location available - must wait for GPS
             const location = await getCurrentLocation(status, false);
             setUserLocation(location);
             setMapRegion({
                 latitude: location.latitude,
                 longitude: location.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+                latitudeDelta: MAP_DELTAS.LATITUDE,
+                longitudeDelta: MAP_DELTAS.LONGITUDE,
             });
             setError(null);
         } catch (err) {
@@ -241,8 +233,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             setMapRegion({
                 latitude: midpoint.latitude,
                 longitude: midpoint.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+                latitudeDelta: MAP_DELTAS.LATITUDE,
+                longitudeDelta: MAP_DELTAS.LONGITUDE,
             });
 
             let optimizedRestaurants: Restaurant[] | undefined;
@@ -350,8 +342,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             setMapRegion({
                 latitude: location.latitude,
                 longitude: location.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+                latitudeDelta: MAP_DELTAS.LATITUDE,
+                longitudeDelta: MAP_DELTAS.LONGITUDE,
             });
         });
     };
@@ -386,7 +378,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                 </TouchableOpacity>
                             )}
 
-                            {/* Skeleton placeholder while loading location */}
                             {locationLoading && !userLocation && (
                                 <View style={[styles.mapContainer, { backgroundColor: COLORS.GRAY_LIGHT, justifyContent: 'center', alignItems: 'center' }]}>
                                     <ActivityIndicator size="large" color={COLORS.PRIMARY} />
@@ -403,14 +394,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                         region={mapRegion || {
                                             latitude: userLocation.latitude,
                                             longitude: userLocation.longitude,
-                                            latitudeDelta: 0.0922,
-                                            longitudeDelta: 0.0421,
+                                            latitudeDelta: MAP_DELTAS.LATITUDE,
+                                            longitudeDelta: MAP_DELTAS.LONGITUDE,
                                         }}
                                         initialRegion={{
                                             latitude: userLocation.latitude,
                                             longitude: userLocation.longitude,
-                                            latitudeDelta: 0.0922,
-                                            longitudeDelta: 0.0421,
+                                            latitudeDelta: MAP_DELTAS.LATITUDE,
+                                            longitudeDelta: MAP_DELTAS.LONGITUDE,
                                         }}
                                     >
                                         <Marker
@@ -425,7 +416,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                             )}
 
                             <View style={styles.inputContainer}>
-                                {/* Show skeleton input area while loading */}
                                 {locationLoading && !userLocation && (
                                     <View style={{ opacity: 0.5 }}>
                                         <Text style={styles.label}>Your Location:</Text>

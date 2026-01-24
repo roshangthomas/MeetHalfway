@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { PlaceCategory, PLACE_CATEGORY_LABELS, MIN_CATEGORIES, MAX_CATEGORIES } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface CategoryPickerProps {
     selectedCategories: PlaceCategory[];
@@ -16,12 +16,10 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
 
     const handleToggleCategory = (category: PlaceCategory) => {
         if (selectedCategories.includes(category)) {
-            // Don't allow deselecting if we're at minimum categories
             if (selectedCategories.length > MIN_CATEGORIES) {
                 onCategoriesChange(selectedCategories.filter(c => c !== category));
             }
         } else {
-            // Don't allow selecting if we're at maximum categories
             if (selectedCategories.length < MAX_CATEGORIES) {
                 onCategoriesChange([...selectedCategories, category]);
             }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface RatingDisplayProps {
     rating?: number;

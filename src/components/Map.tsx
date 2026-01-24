@@ -2,7 +2,7 @@ import React, { useState, forwardRef, ForwardRefRenderFunction } from 'react';
 import { StyleSheet, View, Dimensions } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Location, Restaurant } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface MapProps {
     userLocation: Location;
@@ -31,14 +31,12 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
             >
                 {mapReady && (
                     <>
-                        {/* User Location */}
                         <Marker
                             coordinate={props.userLocation}
                             title="Your Location"
                             pinColor="blue"
                         />
 
-                        {/* Partner Location */}
                         {props.partnerLocation && (
                             <Marker
                                 coordinate={props.partnerLocation}
@@ -47,7 +45,6 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                             />
                         )}
 
-                        {/* Midpoint */}
                         {props.midpoint && (
                             <Marker
                                 coordinate={props.midpoint}
@@ -56,7 +53,6 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                             />
                         )}
 
-                        {/* Restaurants */}
                         {props.restaurants.map((restaurant) => (
                             <Marker
                                 key={restaurant.id}

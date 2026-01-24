@@ -1,2 +1,2 @@
-export { googleMapsClient, ENDPOINTS } from './client';
+export { googleMapsClient, ENDPOINTS, CACHE_TTL } from './client';
 

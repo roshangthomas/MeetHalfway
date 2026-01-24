@@ -4,6 +4,7 @@ export const COLORS = {
     SECONDARY: '#7D67EE',
     BACKGROUND: '#F8F9FA',
     SURFACE: '#FFFFFF',
+    WHITE: '#FFFFFF',
     TEXT: '#212121',
     TEXT_SECONDARY: '#757575',
     ERROR: '#B00020',
@@ -16,4 +17,10 @@ export const COLORS = {
     WARNING_BANNER_BG: '#FFF9C4',
     WARNING_BANNER_BORDER: '#FFD600',
     WARNING_BANNER_TEXT: '#5D4037',
-}; 
+    OPEN_BG: 'rgba(39, 174, 96, 0.2)',
+    OPEN_TEXT: '#27AE60',
+    CLOSED_BG: 'rgba(231, 76, 60, 0.2)',
+    CLOSED_TEXT: '#E74C3C',
+} as const;
+
+export type ColorKey = keyof typeof COLORS;

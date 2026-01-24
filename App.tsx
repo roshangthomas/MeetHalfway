@@ -12,6 +12,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { ChangeLocationScreen } from './src/screens/ChangeLocationScreen';
 import * as SplashScreen from 'expo-splash-screen';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
+import { QueryProvider } from './src/providers/QueryProvider';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -53,7 +54,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <QueryProvider>
       <NavigationContainer onReady={onLayoutRootView}>
         <ErrorBoundary>
           <OfflineNotice />
@@ -106,6 +107,6 @@ export default function App() {
           duration={appReadyTime !== null && appReadyTime < 500 ? 500 : 800}
         />
       )}
-    </>
+    </QueryProvider>
   );
 }

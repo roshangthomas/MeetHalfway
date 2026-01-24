@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { TravelMode } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface TravelModePickerProps {
     selectedMode: TravelMode;

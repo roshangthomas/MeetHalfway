@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import LottieView from 'lottie-react-native';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface AnimatedSplashProps {
     message?: string;
@@ -17,7 +17,6 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({
     const animationRef = useRef<LottieView>(null);
 
     useEffect(() => {
-        // Start animation and set a timer to call onAnimationFinish after duration
         if (onAnimationFinish) {
             const timer = setTimeout(() => {
                 onAnimationFinish();

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Alert, AppState, AppStateStatus } from 'react-native';
 import { checkPreciseLocationPermission, getCurrentLocation, LocationPermissionStatus } from '../services/location';
-import { openLocationSettings } from '../utils/settings';
+import { openLocationSettings, logger } from '../utils';
 import { Location } from '../types';
 
 interface UseLocationPermissionReturn {
@@ -58,7 +58,7 @@ export const useLocationPermission = (): UseLocationPermissionReturn => {
                                             const location = await getCurrentLocation();
                                             onLocationUpdated(location);
                                         } catch (error) {
-                                            console.error('Failed to get updated location:', error);
+                                            logger.error('Failed to get updated location:', error);
                                         }
                                     }
                                 }

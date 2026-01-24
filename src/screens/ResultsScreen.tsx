@@ -4,7 +4,7 @@ import { RestaurantList } from '../components/RestaurantList';
 import { SortOption, RootStackParamList } from '../types';
 import { styles } from '../styles/Results.styles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 import { Ionicons } from '@expo/vector-icons';
 import { FilterModal, FilterOptions } from '../components/FilterModal';
 import { FontAwesome } from '@expo/vector-icons';
@@ -27,7 +27,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         maxPrice: 4,
     });
 
-    // Load fonts
     useEffect(() => {
         async function loadFonts() {
             await Font.loadAsync({
@@ -41,19 +40,15 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
     }, []);
 
     const sortedAndFilteredRestaurants = useMemo(() => {
-        // First apply filters
         let filteredResults = restaurants.filter(restaurant => {
-            // Filter by minimum rating
             if (filters.minRating > 0 && (!restaurant.rating || restaurant.rating < filters.minRating)) {
                 return false;
             }
 
-            // Filter by minimum reviews
             if (filters.minReviews > 0 && (!restaurant.totalRatings || restaurant.totalRatings < filters.minReviews)) {
                 return false;
             }
 
-            // Filter by price level
             if (restaurant.priceLevel && restaurant.priceLevel > filters.maxPrice) {
                 return false;
             }
@@ -61,7 +56,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
             return true;
         });
 
-        // Then sort the filtered results
         return [...filteredResults].sort((a, b) => {
             switch (sortOption) {
                 case 'rating':
@@ -81,7 +75,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                     return aDiff - bDiff;
                 case 'distance':
                 default:
-                    // Default sort by distance
                     const aDistance = a.distance ? parseFloat(a.distance.replace(/[^0-9.]/g, '')) : 0;
                     const bDistance = b.distance ? parseFloat(b.distance.replace(/[^0-9.]/g, '')) : 0;
                     return aDistance - bDistance;
@@ -99,7 +92,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         setIsSortModalVisible(false);
     };
 
-    // Get the active filter count
     const getActiveFilterCount = (): number => {
         let count = 0;
         if (filters.minRating > 0) count++;
@@ -108,7 +100,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         return count;
     };
 
-    // Get sort option display name
     const getSortOptionDisplayName = (): string => {
         switch (sortOption) {
             case 'distance':
@@ -127,7 +118,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
-                {/* Filter and Sort Bar */}
                 <View style={styles.filterSortBar}>
                     <View style={styles.divider} />
 

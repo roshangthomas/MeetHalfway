@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, Dimensions, Platform } from 'react-native';
 import LottieView from 'lottie-react-native';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface LoadingOverlayProps {
     visible: boolean;

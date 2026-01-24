@@ -17,13 +17,12 @@ import {
 } from '../services/location';
 import { Location, RootStackParamList } from '../types';
 import { styles } from '../styles/App.styles';
-import { ERROR_MESSAGES } from '../constants/index';
+import { ERROR_MESSAGES, COLORS } from '../constants';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
 import { useLocationPermission } from '../hooks/useLocationPermission';
-import { logger } from '../utils/logger';
+import { logger } from '../utils';
 
 type ChangeLocationScreenProps = NativeStackScreenProps<RootStackParamList, 'ChangeLocation'>;
 

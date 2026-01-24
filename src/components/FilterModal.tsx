@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 export interface FilterOptions {
     minRating: number;
@@ -37,12 +37,9 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     const [filters, setFilters] = useState<FilterOptions>(initialFilters);
     const [tempRating, setTempRating] = useState(initialFilters.minRating);
     const [tempPrice, setTempPrice] = useState(initialFilters.maxPrice);
-
-    // Add refs to track if the user is currently sliding
     const ratingSliderActive = useRef(false);
     const priceSliderActive = useRef(false);
 
-    // Synchronize state when initialFilters change
     useEffect(() => {
         setTempRating(initialFilters.minRating);
         setTempPrice(initialFilters.maxPrice);
@@ -112,7 +109,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                             </View>
 
                             <ScrollView style={styles.scrollView}>
-                                {/* Rating Filter */}
                                 <View style={styles.filterSection}>
                                     <Text style={styles.filterTitle}>Minimum Rating</Text>
                                     <View style={styles.sliderContainer}>
@@ -163,7 +159,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                     </View>
                                 </View>
 
-                                {/* Minimum Reviews Filter */}
                                 <View style={styles.filterSection}>
                                     <Text style={styles.filterTitle}>Minimum Reviews</Text>
                                     <View style={styles.inputContainer}>
@@ -175,21 +170,18 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                             keyboardType="number-pad"
                                             value={filters.minReviews.toString() === "0" ? "" : filters.minReviews.toString()}
                                             onChangeText={(text) => {
-                                                // Handle empty text case
                                                 if (text === "") {
                                                     setFilters({ ...filters, minReviews: 0 });
                                                     return;
                                                 }
 
                                                 const value = parseInt(text);
-                                                // Validate the input
                                                 if (isNaN(value)) {
                                                     return;
                                                 }
 
-                                                // Check for negative values
                                                 if (value < 0) {
-                                                    setFilters({ ...filters, minReviews: -1 }); // Setting to -1 to indicate error
+                                                    setFilters({ ...filters, minReviews: -1 });
                                                 } else {
                                                     setFilters({ ...filters, minReviews: value });
                                                 }
@@ -204,7 +196,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                     )}
                                 </View>
 
-                                {/* Price Level Filter */}
                                 <View style={styles.filterSection}>
                                     <Text style={styles.filterTitle}>Maximum Price Level</Text>
                                     <View style={styles.sliderContainer}>
@@ -266,7 +257,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                         filters.minReviews < 0 && styles.applyButtonDisabled
                                     ]}
                                     onPress={() => {
-                                        // Don't apply if there are validation errors
                                         if (filters.minReviews < 0) {
                                             return;
                                         }

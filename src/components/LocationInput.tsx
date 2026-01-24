@@ -15,7 +15,8 @@ import {
     UIManager,
 } from 'react-native';
 import { getPlacePredictions } from '../services/places';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
+import { logger } from '../utils';
 
 interface LocationInputProps {
     value: string | null;
@@ -41,17 +42,21 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     const [isFocused, setIsFocused] = useState(false);
     const [dropdownPosition, setDropdownPosition] = useState({ top: 0, maxHeight: 200 });
     const inputRef = useRef<TextInput>(null);
-
-    // Add ref to track selection state that persists across re-renders
     const selectionMadeRef = useRef(false);
 
     useEffect(() => {
         if (!selectionMadeRef.current) {
             const fetchPredictions = async () => {
                 if (value && value.length > 2) {
-                    const results = await getPlacePredictions(value);
-                    setPredictions(results.slice(0, 5));
-                    setShowPredictions(true);
+                    try {
+                        const results = await getPlacePredictions(value);
+                        setPredictions(results.slice(0, 5));
+                        setShowPredictions(true);
+                    } catch (error) {
+                        logger.error('Failed to fetch place predictions:', error);
+                        setPredictions([]);
+                        setShowPredictions(false);
+                    }
                 } else {
                     setPredictions([]);
                     setShowPredictions(false);
@@ -102,32 +107,21 @@ export const LocationInput: React.FC<LocationInputProps> = ({
     }, []);
 
     const clearAllDropdowns = () => {
-        // Mark that a selection was made to prevent re-showing suggestions
         selectionMadeRef.current = true;
-
-        // Clear all dropdown-related states
         setShowPredictions(false);
         setPredictions([]);
         setSuggestions([]);
         setIsFocused(false);
-
-        // Dismiss keyboard
         Keyboard.dismiss();
     };
 
     const handleSelectPrediction = (prediction: string) => {
-        // Update the text field first
         onChangeText(prediction);
-
-        // Then clear all dropdowns and dismiss keyboard
         clearAllDropdowns();
     };
 
     const handleSelectSuggestion = (suggestion: Suggestion) => {
-        // Update the text field first
         onChangeText(suggestion.description);
-
-        // Then clear all dropdowns and dismiss keyboard
         clearAllDropdowns();
     };
 
@@ -146,7 +140,6 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                     style={styles.input}
                     value={value || ''}
                     onChangeText={(text) => {
-                        // Reset selection flag when user types
                         selectionMadeRef.current = false;
                         onChangeText(text);
                     }}
@@ -155,7 +148,6 @@ export const LocationInput: React.FC<LocationInputProps> = ({
                     onFocus={handleFocus}
                     onBlur={() => {
                         setTimeout(() => {
-                            // Only clear focus state if no selection was made
                             if (!selectionMadeRef.current) {
                                 setIsFocused(false);
                                 setShowPredictions(false);
