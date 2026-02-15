@@ -21,6 +21,9 @@ export const COLORS = {
     OPEN_TEXT: '#27AE60',
     CLOSED_BG: 'rgba(231, 76, 60, 0.2)',
     CLOSED_TEXT: '#E74C3C',
+    OVERLAY: 'rgba(0, 0, 0, 0.5)',
+    BORDER_LIGHT: 'rgba(0, 0, 0, 0.05)',
+    OFFLINE_BG: '#b52424',
 } as const;
 
 export type ColorKey = keyof typeof COLORS;

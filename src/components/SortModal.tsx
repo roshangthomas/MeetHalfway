@@ -10,7 +10,7 @@ import {
     TouchableWithoutFeedback
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { COLORS } from '../constants';
+import { COLORS, SPACING, FONT_SIZES } from '../constants';
 import { SortOption } from '../types';
 
 interface SortModalProps {
@@ -80,7 +80,7 @@ export const SortModal: React.FC<SortModalProps> = ({
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: COLORS.OVERLAY,
         justifyContent: 'flex-end',
     },
     modalContent: {
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
+        padding: SPACING.LARGE,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.GRAY_LIGHT,
     },
@@ -112,8 +112,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 20,
+        paddingVertical: SPACING.MEDIUM,
+        paddingHorizontal: SPACING.LARGE,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.GRAY_LIGHT,
     },
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     optionLabel: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         color: COLORS.TEXT,
     },
 }); 

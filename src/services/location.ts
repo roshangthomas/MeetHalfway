@@ -1,5 +1,4 @@
 import * as Location from 'expo-location';
-import { GOOGLE_MAPS_API_KEY } from '@env';
 import { Location as LocationType, PlaceCategory, Restaurant, TravelMode } from '../types';
 import { ERROR_MESSAGES, SEARCH_RADIUS, MAX_RESULTS } from '../constants';
 import { Platform } from 'react-native';
@@ -9,7 +8,7 @@ import {
     GooglePlacesResponse,
     GooglePlaceResult,
 } from '../types/api';
-import { logger, isKnownErrorMessage } from '../utils';
+import { logger, isKnownErrorMessage, buildPhotoUrl } from '../utils';
 import { googleMapsClient, ENDPOINTS, CACHE_TTL } from '../api/client';
 import {
     getBatchTravelInfo,
@@ -111,7 +110,7 @@ export const geocodeAddress = async (address: string): Promise<LocationType> => 
     try {
         const response = await googleMapsClient.get<GoogleGeocodingResponse>(
             ENDPOINTS.geocode,
-            { address: encodeURIComponent(address) },
+            { address },
             { cacheTTL: CACHE_TTL.GEOCODE }
         );
 
@@ -277,7 +276,7 @@ export const findOptimalMeetingPlaces = async (
                     latitude: place.geometry.location.lat,
                     longitude: place.geometry.location.lng,
                     photoUrl: place.photos?.[0]
-                        ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=200&photoreference=${place.photos[0].photo_reference}&key=${GOOGLE_MAPS_API_KEY}`
+                        ? buildPhotoUrl(place.photos[0].photo_reference)
                         : undefined,
                     totalRatings: place.user_ratings_total || 0,
                     priceLevel: place.price_level || 0,

@@ -82,6 +82,17 @@ export interface GooglePlaceDetailsResponse {
         opening_hours?: {
             weekday_text?: string[];
         };
+        editorial_summary?: {
+            overview?: string;
+        };
+    };
+    status: string;
+}
+
+export interface GooglePlaceDetailsGeoResponse {
+    result: {
+        geometry: { location: { lat: number; lng: number } };
+        formatted_address: string;
     };
     status: string;
 }

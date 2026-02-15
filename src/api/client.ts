@@ -82,9 +82,9 @@ class GoogleMapsApiClient {
     async get<T>(
         endpoint: string,
         params?: Record<string, unknown>,
-        options: { cacheTTL?: number; skipCache?: boolean } = {}
+        options: { cacheTTL?: number; skipCache?: boolean; timeout?: number } = {}
     ): Promise<T> {
-        const { cacheTTL = this.DEFAULT_CACHE_TTL, skipCache = false } = options;
+        const { cacheTTL = this.DEFAULT_CACHE_TTL, skipCache = false, timeout } = options;
         const cacheKey = this.getCacheKey(endpoint, params);
 
         if (!skipCache) {
@@ -95,7 +95,7 @@ class GoogleMapsApiClient {
             }
         }
 
-        const response = await this.client.get<T>(endpoint, { params });
+        const response = await this.client.get<T>(endpoint, { params, ...(timeout ? { timeout } : {}) });
 
         this.cache.set(cacheKey, {
             data: response.data,

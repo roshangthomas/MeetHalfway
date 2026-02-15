@@ -10,8 +10,6 @@ import {
     ActivityIndicator,
     Dimensions,
 } from 'react-native';
-import MapViewWrapper from '../components/MapViewWrapper';
-import { Marker, Region } from 'react-native-maps';
 import { LocationInput } from '../components/LocationInput';
 import { TravelModePicker } from '../components/TravelModePicker';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -19,7 +17,6 @@ import { OfflineNotice } from '../components/OfflineNotice';
 import {
     getCurrentLocation,
     getLastKnownLocation,
-    geocodeAddress,
     calculateMidpoint,
     calculateRoadMidpoint,
     findOptimalMeetingPlaces,
@@ -28,22 +25,23 @@ import {
 import { searchRestaurants, getTravelInfo } from '../services/places';
 import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from '../types';
 import { styles } from '../styles/App.styles';
-import { ERROR_MESSAGES } from '../constants';
+import { ERROR_MESSAGES, MAX_RESULTS } from '../constants';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, MAP_DELTAS } from '../constants';
+import { COLORS } from '../constants';
 import { useLocationPermission } from '../hooks/useLocationPermission';
-import { formatAddressForDisplay, logger } from '../utils';
-
-const { height } = Dimensions.get('window');
+import { formatAddressForDisplay, logger, resolveLocation, createRegionFromLocation } from '../utils';
+import MapViewWrapper from '../components/MapViewWrapper';
+import { Marker, Region } from 'react-native-maps';
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
     const [partnerAddress, setPartnerAddress] = useState<string | null>(null);
+    const [partnerPlaceId, setPartnerPlaceId] = useState<string | null>(null);
     const [userAddress, setUserAddress] = useState<string | null>(null);
     const [userLocation, setUserLocation] = useState<Location | null>(null);
     const [loading, setLoading] = useState(false);
@@ -67,27 +65,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         if (route.params?.newLocation && route.params?.newAddress) {
             setUserLocation(route.params.newLocation);
             setUserAddress(route.params.newAddress);
-            setMapRegion({
-                latitude: route.params.newLocation.latitude,
-                longitude: route.params.newLocation.longitude,
-                latitudeDelta: MAP_DELTAS.LATITUDE,
-                longitudeDelta: MAP_DELTAS.LONGITUDE,
-            });
-
+            setMapRegion(createRegionFromLocation(route.params.newLocation));
             navigation.setParams({ newLocation: undefined, newAddress: undefined });
         }
     }, [route.params?.newLocation, route.params?.newAddress, navigation]);
 
     useEffect(() => {
         if (userLocation && !mapRegion) {
-            setMapRegion({
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: MAP_DELTAS.LATITUDE,
-                longitudeDelta: MAP_DELTAS.LONGITUDE,
-            });
+            setMapRegion(createRegionFromLocation(userLocation));
         }
-    }, [userLocation, mapRegion]);
+    }, [userLocation]);
 
     useEffect(() => {
         const checkLocationServices = async () => {
@@ -121,7 +108,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
 
         setLocationLoading(true);
         try {
-            // Check permission once
             const status = await checkPermission();
 
             if (status === 'denied') {
@@ -136,23 +122,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             const cachedLocation = await getLastKnownLocation();
             if (cachedLocation) {
                 setUserLocation(cachedLocation);
-                setMapRegion({
-                    latitude: cachedLocation.latitude,
-                    longitude: cachedLocation.longitude,
-                    latitudeDelta: MAP_DELTAS.LATITUDE,
-                    longitudeDelta: MAP_DELTAS.LONGITUDE,
-                });
+                setMapRegion(createRegionFromLocation(cachedLocation));
                 setLocationLoading(false);
                 setError(null);
 
                 getCurrentLocation(status, false).then((freshLocation) => {
                     setUserLocation(freshLocation);
-                    setMapRegion({
-                        latitude: freshLocation.latitude,
-                        longitude: freshLocation.longitude,
-                        latitudeDelta: MAP_DELTAS.LATITUDE,
-                        longitudeDelta: MAP_DELTAS.LONGITUDE,
-                    });
+                    setMapRegion(createRegionFromLocation(freshLocation));
                 }).catch((err) => {
                     logger.warn('Background location refresh failed:', err);
                 });
@@ -161,12 +137,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
 
             const location = await getCurrentLocation(status, false);
             setUserLocation(location);
-            setMapRegion({
-                latitude: location.latitude,
-                longitude: location.longitude,
-                latitudeDelta: MAP_DELTAS.LATITUDE,
-                longitudeDelta: MAP_DELTAS.LONGITUDE,
-            });
+            setMapRegion(createRegionFromLocation(location));
             setError(null);
         } catch (err) {
             logger.error('Failed to get user location:', err);
@@ -211,7 +182,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         try {
             let partnerLoc: Location;
             try {
-                partnerLoc = await geocodeAddress(partnerAddress);
+                partnerLoc = await resolveLocation(partnerAddress, partnerPlaceId);
             } catch (geocodeError) {
                 if (geocodeError instanceof Error) {
                     setError(geocodeError.message);
@@ -230,13 +201,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                 midpoint = calculateMidpoint(userLocation, partnerLoc);
             }
 
-            setMapRegion({
-                latitude: midpoint.latitude,
-                longitude: midpoint.longitude,
-                latitudeDelta: MAP_DELTAS.LATITUDE,
-                longitudeDelta: MAP_DELTAS.LONGITUDE,
-            });
-
             let optimizedRestaurants: Restaurant[] | undefined;
             try {
                 optimizedRestaurants = await findOptimalMeetingPlaces(
@@ -244,7 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                     partnerLoc,
                     travelMode,
                     selectedCategories,
-                    20
+                    MAX_RESULTS.RESTAURANTS
                 );
             } catch (searchError) {
                 logger.warn('Optimized venue search failed, falling back to simple search', searchError);
@@ -278,7 +242,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                 );
 
                 allRestaurants.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-                allRestaurants = allRestaurants.slice(0, 20);
+                allRestaurants = allRestaurants.slice(0, MAX_RESULTS.RESTAURANTS);
 
                 const travelPromises = allRestaurants.map(async (restaurant) => {
                     try {
@@ -339,12 +303,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
     const handlePreciseLocationPrompt = () => {
         promptForPreciseLocation((location) => {
             setUserLocation(location);
-            setMapRegion({
-                latitude: location.latitude,
-                longitude: location.longitude,
-                latitudeDelta: MAP_DELTAS.LATITUDE,
-                longitudeDelta: MAP_DELTAS.LONGITUDE,
-            });
         });
     };
 
@@ -364,6 +322,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                         keyboardShouldPersistTaps="handled"
                         contentContainerStyle={styles.scrollViewContent}
                     >
+                        {locationLoading && !userLocation ? (
+                            <View style={styles.mapLoadingContainer}>
+                                <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                            </View>
+                        ) : mapRegion ? (
+                            <View style={styles.mapContainer}>
+                                <MapViewWrapper
+                                    style={styles.map}
+                                    region={mapRegion}
+                                    scrollEnabled={false}
+                                    zoomEnabled={false}
+                                    rotateEnabled={false}
+                                    pitchEnabled={false}
+                                >
+                                    {userLocation && (
+                                        <Marker
+                                            coordinate={{
+                                                latitude: userLocation.latitude,
+                                                longitude: userLocation.longitude,
+                                            }}
+                                            title="You"
+                                        />
+                                    )}
+                                </MapViewWrapper>
+                            </View>
+                        ) : null}
+
                         <View style={styles.content}>
                             {permissionStatus === 'limited' && Platform.OS === 'android' && (
                                 <TouchableOpacity
@@ -378,115 +363,114 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                 </TouchableOpacity>
                             )}
 
-                            {locationLoading && !userLocation && (
-                                <View style={[styles.mapContainer, { backgroundColor: COLORS.GRAY_LIGHT, justifyContent: 'center', alignItems: 'center' }]}>
-                                    <ActivityIndicator size="large" color={COLORS.PRIMARY} />
-                                    <Text style={{ marginTop: 8, color: COLORS.GRAY, fontSize: 14 }}>
-                                        Getting your location...
-                                    </Text>
-                                </View>
-                            )}
-
-                            {userLocation && (
-                                <View style={styles.mapContainer}>
-                                    <MapViewWrapper
-                                        style={styles.map}
-                                        region={mapRegion || {
-                                            latitude: userLocation.latitude,
-                                            longitude: userLocation.longitude,
-                                            latitudeDelta: MAP_DELTAS.LATITUDE,
-                                            longitudeDelta: MAP_DELTAS.LONGITUDE,
-                                        }}
-                                        initialRegion={{
-                                            latitude: userLocation.latitude,
-                                            longitude: userLocation.longitude,
-                                            latitudeDelta: MAP_DELTAS.LATITUDE,
-                                            longitudeDelta: MAP_DELTAS.LONGITUDE,
-                                        }}
-                                    >
-                                        <Marker
-                                            coordinate={{
-                                                latitude: userLocation.latitude,
-                                                longitude: userLocation.longitude,
-                                            }}
-                                            title="Your Location"
-                                        />
-                                    </MapViewWrapper>
-                                </View>
-                            )}
-
-                            <View style={styles.inputContainer}>
+                            <View style={styles.routeCard}>
                                 {locationLoading && !userLocation && (
-                                    <View style={{ opacity: 0.5 }}>
-                                        <Text style={styles.label}>Your Location:</Text>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
-                                            <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-                                            <Text style={{ marginLeft: 8, color: COLORS.GRAY }}>Detecting location...</Text>
+                                    <View style={styles.routeCardLoading}>
+                                        <View style={styles.routeRow}>
+                                            <View style={styles.routeDotContainer}>
+                                                <View style={[styles.routeDot, styles.routeDotOrigin]} />
+                                            </View>
+                                            <View style={styles.routeInputArea}>
+                                                <ActivityIndicator size="small" color={COLORS.PRIMARY} />
+                                                <Text style={styles.routeLoadingText}>Detecting location...</Text>
+                                            </View>
                                         </View>
-                                        <Text style={styles.label}>Partner's Location:</Text>
-                                        <View style={{ height: 48, backgroundColor: COLORS.GRAY_LIGHT, borderRadius: 8, marginBottom: 12 }} />
+                                        <View style={styles.routeConnector}>
+                                            <View style={styles.routeDotSmall} />
+                                            <View style={styles.routeDotSmall} />
+                                            <View style={styles.routeDotSmall} />
+                                        </View>
+                                        <View style={styles.routeRow}>
+                                            <View style={styles.routeDotContainer}>
+                                                <View style={[styles.routeDot, styles.routeDotDestination]} />
+                                            </View>
+                                            <View style={[styles.routeInputPlaceholder, { backgroundColor: COLORS.GRAY_LIGHT }]} />
+                                        </View>
                                     </View>
                                 )}
 
                                 {userLocation && (
                                     <>
-                                        <View style={styles.userLocationContainer}>
-                                            <Text style={styles.label}>Your Location:</Text>
-                                            <View style={styles.locationInfoContainer}>
-                                                <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
+                                        <View style={styles.routeRow}>
+                                            <View style={styles.routeDotContainer}>
+                                                <View style={[styles.routeDot, styles.routeDotOrigin]} />
+                                            </View>
+                                            <TouchableOpacity
+                                                style={styles.routeLocationRow}
+                                                onPress={handleChangeLocation}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Text style={styles.routeLocationText} numberOfLines={1} ellipsizeMode="tail">
                                                     {formatAddressForDisplay(userAddress || "Current Location")}
                                                 </Text>
-                                                <TouchableOpacity
-                                                    style={[styles.button, styles.secondaryButton, styles.changeLocationButton]}
-                                                    onPress={handleChangeLocation}
-                                                >
-                                                    <Text style={styles.secondaryButtonText}>
-                                                        Change
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-
-                                        <Text style={styles.label}>Partner's Location:</Text>
-                                        <View ref={partnerLocationInputRef}>
-                                            <LocationInput
-                                                value={partnerAddress || ''}
-                                                onChangeText={setPartnerAddress}
-                                                placeholder="Enter partner's location..."
-                                                onInputFocus={handlePartnerLocationFocus}
-                                            />
-                                        </View>
-
-                                        <TravelModePicker
-                                            selectedMode={travelMode}
-                                            onModeChange={setTravelMode}
-                                        />
-
-                                        <CategoryPicker
-                                            selectedCategories={selectedCategories}
-                                            onCategoriesChange={setSelectedCategories}
-                                        />
-
-                                        <View style={styles.findButtonContainer}>
-                                            <TouchableOpacity
-                                                style={[
-                                                    styles.findButton,
-                                                    (!partnerAddress || loading) && styles.buttonDisabled
-                                                ]}
-                                                onPress={handleSearch}
-                                                disabled={loading || !partnerAddress}
-                                                accessibilityLabel="Find meeting places"
-                                                accessibilityHint="Searches for places between your location and your partner's location"
-                                                accessibilityRole="button"
-                                            >
-                                                <Text style={styles.findButtonText}>
-                                                    Find Meeting Point & Places
-                                                </Text>
+                                                <Text style={styles.routeChangeText}>Change</Text>
                                             </TouchableOpacity>
+                                        </View>
+
+                                        <View style={styles.routeConnector}>
+                                            <View style={styles.routeDotSmall} />
+                                            <View style={styles.routeDotSmall} />
+                                            <View style={styles.routeDotSmall} />
+                                        </View>
+
+                                        <View style={styles.routeRow}>
+                                            <View style={styles.routeDotContainer}>
+                                                <View style={[styles.routeDot, styles.routeDotDestination]} />
+                                            </View>
+                                            <View ref={partnerLocationInputRef} style={styles.routeInputArea}>
+                                                <LocationInput
+                                                    value={partnerAddress || ''}
+                                                    onChangeText={(text) => {
+                                                        setPartnerAddress(text);
+                                                        setPartnerPlaceId(null);
+                                                    }}
+                                                    onPlaceSelected={(placeId, description) => {
+                                                        setPartnerPlaceId(placeId);
+                                                        setPartnerAddress(description);
+                                                    }}
+                                                    placeholder="Enter partner's location..."
+                                                    onInputFocus={handlePartnerLocationFocus}
+                                                    userLocation={userLocation}
+                                                />
+                                            </View>
                                         </View>
                                     </>
                                 )}
                             </View>
+
+                            {userLocation && (
+                                <View style={styles.preferencesSection}>
+                                    <TravelModePicker
+                                        selectedMode={travelMode}
+                                        onModeChange={setTravelMode}
+                                    />
+
+                                    <CategoryPicker
+                                        selectedCategories={selectedCategories}
+                                        onCategoriesChange={setSelectedCategories}
+                                    />
+                                </View>
+                            )}
+
+                            {userLocation && (
+                                <View style={styles.findButtonContainer}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.findButton,
+                                            (!partnerAddress || loading) && styles.buttonDisabled
+                                        ]}
+                                        onPress={handleSearch}
+                                        disabled={loading || !partnerAddress}
+                                        accessibilityLabel="Find meeting places"
+                                        accessibilityHint="Searches for places between your location and your partner's location"
+                                        accessibilityRole="button"
+                                    >
+                                        <Text style={styles.findButtonText}>
+                                            Meet Halfway
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
 
                             {(error || permissionStatus === 'denied') && (
                                 <Text style={styles.error}>
@@ -500,4 +484,3 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         </ErrorBoundary>
     );
 };
-

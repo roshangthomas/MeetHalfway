@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { COLORS } from '../constants';
+import { COLORS, SPACING, FONT_SIZES } from '../constants';
 
 export const styles = StyleSheet.create({
     container: {
@@ -9,78 +9,57 @@ export const styles = StyleSheet.create({
     content: {
         flex: 1,
     },
-    // Filter and sort bar styles
+    // --- Pill chip filter/sort bar ---
     filterSortBar: {
         backgroundColor: COLORS.SURFACE,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.GRAY_LIGHT,
     },
-    divider: {
-        height: 1,
-        backgroundColor: COLORS.GRAY_LIGHT,
-        width: '100%',
-    },
-    filterSortButtonsContainer: {
+    pillScrollContent: {
+        paddingHorizontal: SPACING.MEDIUM,
+        paddingVertical: 12,
+        gap: SPACING.SMALL,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
-        paddingHorizontal: 16,
     },
-    filterSortButton: {
-        flex: 1,
+    pillChip: {
         flexDirection: 'row',
-        justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 8,
+        gap: 6,
+        paddingHorizontal: 14,
+        paddingVertical: SPACING.SMALL,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: COLORS.GRAY_LIGHT,
+        backgroundColor: COLORS.SURFACE,
     },
-    filterSortButtonText: {
-        fontSize: 20,
+    pillChipActive: {
+        backgroundColor: COLORS.TEXT,
+        borderColor: COLORS.TEXT,
+    },
+    pillChipText: {
+        fontSize: FONT_SIZES.MEDIUM,
         fontWeight: '500',
         color: COLORS.TEXT,
-        marginRight: 8,
     },
-    sortIconBox: {
-        width: 36,
-        height: 36,
-        backgroundColor: COLORS.SKELETON,
-        borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 8,
+    pillChipTextActive: {
+        color: COLORS.SURFACE,
     },
-    sortIconText: {
-        fontSize: 20,
-        color: COLORS.TEXT,
-        fontWeight: '600',
-    },
-    verticalDivider: {
-        width: 1,
-        height: '70%',
-        backgroundColor: COLORS.GRAY_LIGHT,
-        marginHorizontal: 8,
-    },
-    // List container styles
+    // --- List ---
     listContainer: {
         flex: 1,
-        marginTop: 8,
     },
     noResultsContainer: {
-        padding: 20,
+        padding: SPACING.LARGE,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: COLORS.SURFACE,
-        borderRadius: 8,
-        marginVertical: 16,
-        marginHorizontal: 16,
-        shadowColor: COLORS.BLACK,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        marginVertical: SPACING.MEDIUM,
+        marginHorizontal: SPACING.MEDIUM,
     },
     noResultsText: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         color: COLORS.TEXT_SECONDARY,
         textAlign: 'center',
         lineHeight: 24,
     },
-}); 
+});

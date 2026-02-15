@@ -12,7 +12,9 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { ChangeLocationScreen } from './src/screens/ChangeLocationScreen';
 import * as SplashScreen from 'expo-splash-screen';
 import { AnimatedSplash } from './src/components/AnimatedSplash';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryProvider } from './src/providers/QueryProvider';
+import { logger } from './src/utils/logger';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -30,7 +32,7 @@ export default function App() {
         setAppIsReady(true);
         setAppReadyTime(Date.now() - startTime.current);
       } catch (e) {
-        console.warn(e);
+        logger.warn('Splash screen preparation error:', e);
         setAppIsReady(true);
         setAppReadyTime(Date.now() - startTime.current);
       }
@@ -54,6 +56,7 @@ export default function App() {
   }
 
   return (
+    <SafeAreaProvider>
     <QueryProvider>
       <NavigationContainer onReady={onLayoutRootView}>
         <ErrorBoundary>
@@ -62,7 +65,7 @@ export default function App() {
             <Stack.Screen
               name="Home"
               component={HomeScreen}
-              options={{ title: 'Whats Halfway' }}
+              options={{ title: 'Meet Halfway' }}
             />
             <Stack.Screen
               name="ChangeLocation"
@@ -108,5 +111,6 @@ export default function App() {
         />
       )}
     </QueryProvider>
+    </SafeAreaProvider>
   );
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, Dimensions, Platform } from 'react-native';
 import LottieView from 'lottie-react-native';
-import { COLORS } from '../constants';
+import { COLORS, SPACING, FONT_SIZES } from '../constants';
 
 interface LoadingOverlayProps {
     visible: boolean;
@@ -41,8 +41,8 @@ const styles = StyleSheet.create({
         height: 200,
     },
     text: {
-        marginTop: 20,
-        fontSize: 18,
+        marginTop: SPACING.LARGE,
+        fontSize: FONT_SIZES.XL,
         color: COLORS.TEXT,
         fontWeight: '600',
     },

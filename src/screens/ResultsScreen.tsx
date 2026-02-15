@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, SafeAreaView, Text, TouchableOpacity } from 'react-native';
+import { View, SafeAreaView, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { RestaurantList } from '../components/RestaurantList';
 import { SortOption, RootStackParamList } from '../types';
 import { styles } from '../styles/Results.styles';
@@ -20,7 +20,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
     const [sortOption, setSortOption] = useState<SortOption>('distance');
     const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
     const [isSortModalVisible, setIsSortModalVisible] = useState(false);
-    const [fontsLoaded, setFontsLoaded] = useState(false);
     const [filters, setFilters] = useState<FilterOptions>({
         minRating: 0,
         minReviews: 0,
@@ -34,7 +33,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 ...Ionicons.font,
                 ...AntDesign.font
             });
-            setFontsLoaded(true);
         }
         loadFonts();
     }, []);
@@ -63,7 +61,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 case 'price':
                     return (a.priceLevel || 0) - (b.priceLevel || 0);
                 case 'travelTimeDiff':
-                    // Calculate travel time difference for sorting
                     const aUserTime = a.durationA ? parseDurationToMinutes(a.durationA) : 0;
                     const aFriendTime = a.durationB ? parseDurationToMinutes(a.durationB) : 0;
                     const aDiff = Math.abs(aUserTime - aFriendTime);
@@ -115,37 +112,113 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         }
     };
 
+    const activeFilterCount = getActiveFilterCount();
+    const hasActiveFilters = activeFilterCount > 0;
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
+                {/* Pill chip filter/sort bar */}
                 <View style={styles.filterSortBar}>
-                    <View style={styles.divider} />
-
-                    <View style={styles.filterSortButtonsContainer}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.pillScrollContent}
+                    >
+                        {/* Filters pill */}
                         <TouchableOpacity
-                            style={styles.filterSortButton}
+                            style={[
+                                styles.pillChip,
+                                hasActiveFilters && styles.pillChipActive,
+                            ]}
                             onPress={() => setIsFilterModalVisible(true)}
                         >
-                            <Text style={styles.filterSortButtonText}>
-                                Filters{getActiveFilterCount() > 0 ? ` (${getActiveFilterCount()})` : ''}
+                            <Ionicons
+                                name="options-outline"
+                                size={16}
+                                color={hasActiveFilters ? COLORS.SURFACE : COLORS.TEXT}
+                            />
+                            <Text style={[
+                                styles.pillChipText,
+                                hasActiveFilters && styles.pillChipTextActive,
+                            ]}>
+                                Filters{hasActiveFilters ? ` (${activeFilterCount})` : ''}
                             </Text>
-                            <FontAwesome name="filter" size={20} color="black" />
                         </TouchableOpacity>
 
-                        <View style={styles.verticalDivider} />
-
+                        {/* Sort pill */}
                         <TouchableOpacity
-                            style={styles.filterSortButton}
+                            style={[
+                                styles.pillChip,
+                                sortOption !== 'distance' && styles.pillChipActive,
+                            ]}
                             onPress={() => setIsSortModalVisible(true)}
                         >
-                            <Text style={styles.filterSortButtonText}>
-                                Sort: {getSortOptionDisplayName()}
+                            <FontAwesome
+                                name="sort-amount-asc"
+                                size={14}
+                                color={sortOption !== 'distance' ? COLORS.SURFACE : COLORS.TEXT}
+                            />
+                            <Text style={[
+                                styles.pillChipText,
+                                sortOption !== 'distance' && styles.pillChipTextActive,
+                            ]}>
+                                {getSortOptionDisplayName()}
                             </Text>
-                            <FontAwesome name="sort" size={20} color={COLORS.TEXT} />
+                            <FontAwesome
+                                name="chevron-down"
+                                size={10}
+                                color={sortOption !== 'distance' ? COLORS.SURFACE : COLORS.TEXT_SECONDARY}
+                            />
                         </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.divider} />
+                        {/* Quick filter: Rating 4+ */}
+                        <TouchableOpacity
+                            style={[
+                                styles.pillChip,
+                                filters.minRating >= 4 && styles.pillChipActive,
+                            ]}
+                            onPress={() => {
+                                setFilters(prev => ({
+                                    ...prev,
+                                    minRating: prev.minRating >= 4 ? 0 : 4,
+                                }));
+                            }}
+                        >
+                            <FontAwesome
+                                name="star"
+                                size={12}
+                                color={filters.minRating >= 4 ? COLORS.SURFACE : COLORS.TEXT}
+                            />
+                            <Text style={[
+                                styles.pillChipText,
+                                filters.minRating >= 4 && styles.pillChipTextActive,
+                            ]}>
+                                4+
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Quick filter: $$ (price ≤ 2) */}
+                        <TouchableOpacity
+                            style={[
+                                styles.pillChip,
+                                filters.maxPrice <= 2 && styles.pillChipActive,
+                            ]}
+                            onPress={() => {
+                                setFilters(prev => ({
+                                    ...prev,
+                                    maxPrice: prev.maxPrice <= 2 ? 4 : 2,
+                                }));
+                            }}
+                        >
+                            <Text style={[
+                                styles.pillChipText,
+                                filters.maxPrice <= 2 && styles.pillChipTextActive,
+                            ]}>
+                                $$
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
                 </View>
 
                 <View style={styles.listContainer}>
@@ -181,4 +254,4 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
             />
         </SafeAreaView>
     );
-}; 
+};

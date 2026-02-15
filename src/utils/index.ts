@@ -1,5 +1,5 @@
 export { openLocationSettings } from './settings';
-export { formatAddressForDisplay, formatPlaceType } from './formatting';
+export { formatAddressForDisplay, formatPlaceType, getShortLocation, getSpecificType, TRAVEL_MODE_ICONS } from './formatting';
 export { parseDurationToMinutes, formatMinutesToDuration } from './duration';
 export { logger } from './logger';
 export {
@@ -28,3 +28,7 @@ export {
     getShareUrl,
     getShareMessage,
 } from './mapUrls';
+export { generateSessionToken } from './sessionToken';
+export { buildPhotoUrl } from './photos';
+export { resolveLocation } from './geocoding';
+export { createRegionFromLocation } from './mapRegion';

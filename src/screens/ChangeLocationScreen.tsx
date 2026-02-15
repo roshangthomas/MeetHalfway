@@ -13,7 +13,6 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import {
     getCurrentLocation,
-    geocodeAddress,
 } from '../services/location';
 import { Location, RootStackParamList } from '../types';
 import { styles } from '../styles/App.styles';
@@ -22,12 +21,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocationPermission } from '../hooks/useLocationPermission';
-import { logger } from '../utils';
+import { logger, resolveLocation } from '../utils';
 
 type ChangeLocationScreenProps = NativeStackScreenProps<RootStackParamList, 'ChangeLocation'>;
 
 export const ChangeLocationScreen: React.FC<ChangeLocationScreenProps> = ({ navigation, route }) => {
     const [userAddress, setUserAddress] = useState('');
+    const [userPlaceId, setUserPlaceId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -108,7 +108,7 @@ export const ChangeLocationScreen: React.FC<ChangeLocationScreenProps> = ({ navi
         setError(null);
 
         try {
-            const geocodedLocation = await geocodeAddress(userAddress);
+            const geocodedLocation = await resolveLocation(userAddress, userPlaceId);
 
             navigation.navigate('Home', {
                 newLocation: geocodedLocation,
@@ -186,7 +186,14 @@ export const ChangeLocationScreen: React.FC<ChangeLocationScreenProps> = ({ navi
                                 <View ref={locationInputRef}>
                                     <LocationInput
                                         value={userAddress}
-                                        onChangeText={setUserAddress}
+                                        onChangeText={(text) => {
+                                            setUserAddress(text);
+                                            setUserPlaceId(null);
+                                        }}
+                                        onPlaceSelected={(placeId, description) => {
+                                            setUserPlaceId(placeId);
+                                            setUserAddress(description);
+                                        }}
                                         placeholder="Enter your location..."
                                         onInputFocus={handleLocationFocus}
                                     />

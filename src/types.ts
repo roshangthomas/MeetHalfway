@@ -13,6 +13,7 @@ export interface Restaurant {
     distance?: string;
     duration?: string;
     photoUrl?: string;
+    photoUrls?: string[];
     totalRatings?: number;
     priceLevel?: number;
     types?: string[];
@@ -28,6 +29,7 @@ export interface Restaurant {
     durationB?: string;
     phoneNumber?: string;
     businessHours?: string[];
+    editorialSummary?: string;
 }
 
 export type TravelMode = 'driving' | 'walking' | 'transit' | 'bicycling';

@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import LottieView from 'lottie-react-native';
-import { COLORS } from '../constants';
+import { COLORS, SPACING, FONT_SIZES } from '../constants';
 
 interface AnimatedSplashProps {
     message?: string;
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#ffffff',
+        backgroundColor: COLORS.WHITE,
         position: 'absolute',
         top: 0,
         left: 0,
@@ -55,18 +55,18 @@ const styles = StyleSheet.create({
         zIndex: 999,
     },
     title: {
-        fontSize: 24,
+        fontSize: FONT_SIZES.XXL,
         fontWeight: 'bold',
         color: COLORS.PRIMARY,
-        marginBottom: 20,
+        marginBottom: SPACING.LARGE,
     },
     animation: {
         width: 150,
         height: 150,
     },
     message: {
-        marginTop: 20,
-        fontSize: 16,
+        marginTop: SPACING.LARGE,
+        fontSize: FONT_SIZES.LARGE,
         color: COLORS.TEXT,
     },
 }); 

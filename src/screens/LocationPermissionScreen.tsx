@@ -20,15 +20,15 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Location as LocationType } from '../types';
-import { geocodeAddress } from '../services/location';
-import { ERROR_MESSAGES, COLORS } from '../constants';
+import { ERROR_MESSAGES, COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 import { Ionicons } from '@expo/vector-icons';
-import { logger } from '../utils';
+import { logger, resolveLocation } from '../utils';
 
 type LocationPermissionScreenProps = NativeStackScreenProps<RootStackParamList, 'LocationPermission'>;
 
 export function LocationPermissionScreen({ navigation }: LocationPermissionScreenProps) {
   const [userAddress, setUserAddress] = useState('');
+  const [userPlaceId, setUserPlaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpened, setSettingsOpened] = useState(false);
@@ -93,7 +93,7 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
     setError(null);
 
     try {
-      const geocodedLocation = await geocodeAddress(userAddress);
+      const geocodedLocation = await resolveLocation(userAddress, userPlaceId);
 
       navigation.reset({
         index: 0,
@@ -226,7 +226,14 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
 
                 <LocationInput
                   value={userAddress}
-                  onChangeText={setUserAddress}
+                  onChangeText={(text) => {
+                    setUserAddress(text);
+                    setUserPlaceId(null);
+                  }}
+                  onPlaceSelected={(placeId, description) => {
+                    setUserPlaceId(placeId);
+                    setUserAddress(description);
+                  }}
                   placeholder="Enter your location..."
                   onInputFocus={handleInputFocus}
                 />
@@ -263,27 +270,27 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
 // Local styles for this screen
 const localStyles = StyleSheet.create({
   compactContent: {
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: SPACING.SMALL,
+    paddingHorizontal: SPACING.SMALL,
   },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    paddingTop: 8,
+    marginBottom: SPACING.MEDIUM,
+    paddingTop: SPACING.SMALL,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: COLORS.TEXT,
-    marginLeft: 8,
+    marginLeft: SPACING.SMALL,
   },
   stepContainer: {
     backgroundColor: COLORS.SURFACE,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.LARGE,
+    padding: SPACING.MEDIUM,
+    marginBottom: SPACING.MEDIUM,
     shadowColor: COLORS.TEXT,
     shadowOffset: {
       width: 0,
@@ -305,15 +312,15 @@ const localStyles = StyleSheet.create({
     backgroundColor: COLORS.PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: SPACING.SMALL,
   },
   stepNumber: {
     color: COLORS.SURFACE,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: FONT_SIZES.MEDIUM,
   },
   stepTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.LARGE,
     fontWeight: '600',
     color: COLORS.TEXT,
   },
@@ -323,7 +330,7 @@ const localStyles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 12,
-    marginBottom: 8,
+    marginBottom: SPACING.SMALL,
     flexDirection: 'row',
     justifyContent: 'center',
   },
@@ -372,25 +379,25 @@ const localStyles = StyleSheet.create({
     paddingBottom: 12,
   },
   manualTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.LARGE,
     fontWeight: '600',
     color: COLORS.TEXT,
-    marginBottom: 8,
+    marginBottom: SPACING.SMALL,
     textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.MEDIUM,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     lineHeight: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.MEDIUM,
   },
   explanationText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.MEDIUM,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
+    marginBottom: SPACING.MEDIUM,
+    paddingHorizontal: SPACING.LARGE,
     lineHeight: 20,
   },
   extraBottomSpace: {

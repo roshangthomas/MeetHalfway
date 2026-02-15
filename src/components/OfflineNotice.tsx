@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import { FontAwesome } from '@expo/vector-icons';
+import { COLORS, FONT_SIZES, SPACING } from '../constants';
 
 export const OfflineNotice: React.FC = () => {
     const [isConnected, setIsConnected] = useState<boolean>(true);
+    const insets = useSafeAreaInsets();
 
     useEffect(() => {
-        // Subscribe to network state updates
         const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
             setIsConnected(state.isConnected ?? true);
         });
 
-        // Cleanup subscription on unmount
         return () => unsubscribe();
     }, []);
 
@@ -20,30 +22,37 @@ export const OfflineNotice: React.FC = () => {
     }
 
     return (
-        <View style={styles.offlineContainer}>
-            <Text style={styles.offlineText}>No Internet Connection</Text>
-            <Text style={styles.offlineSubtext}>Please check your WiFi or cellular connection</Text>
+        <View style={[styles.container, { paddingTop: insets.top + SPACING.SMALL }]}>
+            <FontAwesome name="wifi" size={16} color={COLORS.WHITE} />
+            <View style={styles.textContainer}>
+                <Text style={styles.title}>No Internet Connection</Text>
+                <Text style={styles.subtitle}>Please check your WiFi or cellular connection</Text>
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    offlineContainer: {
-        backgroundColor: '#b52424',
-        height: 50,
-        justifyContent: 'center',
+    container: {
+        backgroundColor: COLORS.OFFLINE_BG,
+        paddingBottom: SPACING.MEDIUM,
+        paddingHorizontal: SPACING.LARGE,
+        flexDirection: 'row',
         alignItems: 'center',
-        flexDirection: 'column',
+        gap: SPACING.MEDIUM,
         width: '100%',
     },
-    offlineText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: 'bold',
+    textContainer: {
+        flex: 1,
     },
-    offlineSubtext: {
-        color: '#fff',
-        fontSize: 12,
+    title: {
+        color: COLORS.WHITE,
+        fontSize: FONT_SIZES.MEDIUM,
+        fontWeight: '700',
+    },
+    subtitle: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: FONT_SIZES.SMALL,
         marginTop: 2,
     },
-}); 
+});

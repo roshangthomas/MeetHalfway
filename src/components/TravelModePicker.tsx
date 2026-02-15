@@ -1,12 +1,20 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { TravelMode } from '../types';
-import { COLORS } from '../constants';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../constants';
 
 interface TravelModePickerProps {
     selectedMode: TravelMode;
     onModeChange: (mode: TravelMode) => void;
 }
+
+const MODE_CONFIG: Record<TravelMode, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
+    driving: { icon: 'car-outline', label: 'Drive' },
+    walking: { icon: 'walk-outline', label: 'Walk' },
+    bicycling: { icon: 'bicycle-outline', label: 'Bike' },
+    transit: { icon: 'train-outline', label: 'Transit' },
+};
 
 export const TravelModePicker: React.FC<TravelModePickerProps> = ({
     selectedMode,
@@ -16,25 +24,34 @@ export const TravelModePicker: React.FC<TravelModePickerProps> = ({
 
     return (
         <View style={styles.container}>
-            {modes.map((mode) => (
-                <TouchableOpacity
-                    key={mode}
-                    style={[
-                        styles.modeButton,
-                        selectedMode === mode && styles.selectedMode,
-                    ]}
-                    onPress={() => onModeChange(mode)}
-                >
-                    <Text
+            {modes.map((mode) => {
+                const isSelected = selectedMode === mode;
+                const config = MODE_CONFIG[mode];
+                return (
+                    <TouchableOpacity
+                        key={mode}
                         style={[
-                            styles.modeText,
-                            selectedMode === mode && styles.selectedModeText,
+                            styles.modeButton,
+                            isSelected && styles.selectedMode,
                         ]}
+                        onPress={() => onModeChange(mode)}
                     >
-                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                    </Text>
-                </TouchableOpacity>
-            ))}
+                        <Ionicons
+                            name={isSelected ? config.icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap : config.icon}
+                            size={22}
+                            color={isSelected ? COLORS.SURFACE : COLORS.TEXT}
+                        />
+                        <Text
+                            style={[
+                                styles.modeText,
+                                isSelected && styles.selectedModeText,
+                            ]}
+                        >
+                            {config.label}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
         </View>
     );
 };
@@ -44,31 +61,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginTop: 12,
-        marginBottom: 16,
-        gap: 8,
+        marginBottom: SPACING.MEDIUM,
+        gap: SPACING.SMALL,
     },
     modeButton: {
         flex: 1,
         backgroundColor: COLORS.SURFACE,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: SPACING.SMALL,
+        borderRadius: BORDER_RADIUS.LARGE,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: COLORS.TEXT,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        ...SHADOWS.SMALL,
+        gap: SPACING.XS,
     },
     selectedMode: {
         backgroundColor: COLORS.PRIMARY,
     },
     modeText: {
-        fontSize: 13,
+        fontSize: 11,
         color: COLORS.TEXT,
         textAlign: 'center',
     },
@@ -76,4 +87,4 @@ const styles = StyleSheet.create({
         color: COLORS.SURFACE,
         fontWeight: '600',
     },
-}); 
+});

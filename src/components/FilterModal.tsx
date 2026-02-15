@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { COLORS } from '../constants';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 
 export interface FilterOptions {
     minRating: number;
@@ -277,7 +277,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 const styles = StyleSheet.create({
     modalContainer: {
         flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: COLORS.OVERLAY,
         justifyContent: 'flex-end',
     },
     modalContent: {
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
+        padding: SPACING.LARGE,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.GRAY_LIGHT,
     },
@@ -307,12 +307,12 @@ const styles = StyleSheet.create({
         maxHeight: '70%',
     },
     filterSection: {
-        padding: 20,
+        padding: SPACING.LARGE,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.GRAY_LIGHT,
     },
     filterTitle: {
-        fontSize: 18,
+        fontSize: FONT_SIZES.XL,
         fontWeight: '600',
         color: COLORS.TEXT,
         marginBottom: 15,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
         height: 40,
     },
     sliderValue: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         color: COLORS.TEXT_SECONDARY,
         marginTop: 5,
     },
@@ -352,47 +352,47 @@ const styles = StyleSheet.create({
     textInput: {
         borderWidth: 1,
         borderColor: COLORS.GRAY_LIGHT,
-        borderRadius: 8,
+        borderRadius: BORDER_RADIUS.MEDIUM,
         padding: 10,
         width: 80,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         marginRight: 10,
     },
     inputLabel: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         color: COLORS.TEXT_SECONDARY,
     },
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        padding: 20,
+        padding: SPACING.LARGE,
         borderTopWidth: 1,
         borderTopColor: COLORS.GRAY_LIGHT,
     },
     resetButton: {
         paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 8,
+        paddingHorizontal: SPACING.LARGE,
+        borderRadius: BORDER_RADIUS.MEDIUM,
         borderWidth: 1,
         borderColor: COLORS.PRIMARY,
         marginRight: 10,
     },
     resetButtonText: {
         color: COLORS.PRIMARY,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
     },
     applyButton: {
         flex: 1,
         backgroundColor: COLORS.PRIMARY,
         paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 8,
+        paddingHorizontal: SPACING.LARGE,
+        borderRadius: BORDER_RADIUS.MEDIUM,
         alignItems: 'center',
     },
     applyButtonText: {
         color: COLORS.SURFACE,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
     },
     textInputError: {
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     },
     errorText: {
         color: COLORS.ERROR || '#FF3B30',
-        fontSize: 14,
+        fontSize: FONT_SIZES.MEDIUM,
         marginTop: 5,
     },
     applyButtonDisabled: {
