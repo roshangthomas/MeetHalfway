@@ -139,7 +139,8 @@ export const styles = StyleSheet.create({
     },
 
     findButtonContainer: {
-        marginTop: SPACING.SMALL,
+        marginTop: SPACING.LARGE,
+        marginBottom: SPACING.MEDIUM,
     },
     findButton: {
         backgroundColor: COLORS.PRIMARY,

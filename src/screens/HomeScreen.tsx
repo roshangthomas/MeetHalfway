@@ -33,10 +33,9 @@ import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 import { useLocationPermission } from '../hooks/useLocationPermission';
-import { formatAddressForDisplay, logger, resolveLocation, createRegionFromLocation, hapticMedium, hapticLight } from '../utils';
+import { formatAddressForDisplay, logger, resolveLocation, hapticMedium, hapticLight } from '../utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MapViewWrapper from '../components/MapViewWrapper';
-import { Marker, Region } from 'react-native-maps';
+import StaticMapPreview from '../components/StaticMapPreview';
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -65,7 +64,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
     const [error, setError] = useState<string | null>(null);
     const [travelMode, setTravelMode] = useState<TravelMode>('driving');
     const [selectedCategories, setSelectedCategories] = useState<PlaceCategory[]>(['restaurant']);
-    const [mapRegion, setMapRegion] = useState<Region | null>(null);
 
     const {
         permissionStatus,
@@ -124,16 +122,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         if (route.params?.newLocation && route.params?.newAddress) {
             setUserLocation(route.params.newLocation);
             setUserAddress(route.params.newAddress);
-            setMapRegion(createRegionFromLocation(route.params.newLocation));
             navigation.setParams({ newLocation: undefined, newAddress: undefined });
         }
     }, [route.params?.newLocation, route.params?.newAddress, navigation]);
-
-    useEffect(() => {
-        if (userLocation && !mapRegion) {
-            setMapRegion(createRegionFromLocation(userLocation));
-        }
-    }, [userLocation]);
 
     useEffect(() => {
         const checkLocationServices = async () => {
@@ -181,13 +172,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
             const cachedLocation = await getLastKnownLocation();
             if (cachedLocation) {
                 setUserLocation(cachedLocation);
-                setMapRegion(createRegionFromLocation(cachedLocation));
                 setLocationLoading(false);
                 setError(null);
 
                 getCurrentLocation(status, false).then((freshLocation) => {
                     setUserLocation(freshLocation);
-                    setMapRegion(createRegionFromLocation(freshLocation));
                 }).catch((err) => {
                     logger.warn('Background location refresh failed:', err);
                 });
@@ -196,7 +185,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
 
             const location = await getCurrentLocation(status, false);
             setUserLocation(location);
-            setMapRegion(createRegionFromLocation(location));
             setError(null);
         } catch (err) {
             logger.error('Failed to get user location:', err);
@@ -413,27 +401,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                             <View style={styles.mapLoadingContainer}>
                                 <ActivityIndicator size="small" color={COLORS.PRIMARY} />
                             </View>
-                        ) : mapRegion ? (
-                            <View style={styles.mapContainer}>
-                                <MapViewWrapper
-                                    style={styles.map}
-                                    region={mapRegion}
-                                    scrollEnabled={false}
-                                    zoomEnabled={false}
-                                    rotateEnabled={false}
-                                    pitchEnabled={false}
-                                >
-                                    {userLocation && (
-                                        <Marker
-                                            coordinate={{
-                                                latitude: userLocation.latitude,
-                                                longitude: userLocation.longitude,
-                                            }}
-                                            title="You"
-                                        />
-                                    )}
-                                </MapViewWrapper>
-                            </View>
+                        ) : userLocation ? (
+                            <StaticMapPreview location={userLocation} />
                         ) : null}
 
                         <View style={styles.content}>
