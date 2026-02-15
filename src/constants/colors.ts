@@ -24,6 +24,7 @@ export const COLORS = {
     OVERLAY: 'rgba(0, 0, 0, 0.5)',
     BORDER_LIGHT: 'rgba(0, 0, 0, 0.05)',
     OFFLINE_BG: '#b52424',
+    HEART: '#FF385C',
 } as const;
 
 export type ColorKey = keyof typeof COLORS;

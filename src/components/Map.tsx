@@ -1,5 +1,5 @@
-import React, { useState, forwardRef, ForwardRefRenderFunction } from 'react';
-import { StyleSheet, View, Dimensions } from 'react-native';
+import React, { useState, useCallback, forwardRef, ForwardRefRenderFunction } from 'react';
+import { StyleSheet, View, Dimensions, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Restaurant, Participant, Location } from '../types';
 import { COLORS, MAP_DELTAS, SPACING, BORDER_RADIUS, PARTICIPANT_COLORS } from '../constants';
@@ -16,6 +16,26 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
     const firstLocation = props.participants[0]?.location;
     if (!firstLocation) return null;
 
+    const handleMapReady = useCallback(() => {
+        setMapReady(true);
+
+        const mapRef = ref as React.MutableRefObject<MapView | null>;
+        if (!mapRef?.current) return;
+
+        const coordinates: Location[] = [];
+        for (const p of props.participants) {
+            if (p.location) coordinates.push(p.location);
+        }
+        if (props.midpoint) coordinates.push(props.midpoint);
+
+        if (coordinates.length >= 2) {
+            mapRef.current.fitToCoordinates(coordinates, {
+                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                animated: false,
+            });
+        }
+    }, [ref, props.participants, props.midpoint]);
+
     return (
         <View style={styles.container}>
             <MapView
@@ -27,7 +47,7 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                     latitudeDelta: MAP_DELTAS.LATITUDE,
                     longitudeDelta: MAP_DELTAS.LONGITUDE,
                 }}
-                onMapReady={() => setMapReady(true)}
+                onMapReady={handleMapReady}
                 showsUserLocation={true}
                 showsMyLocationButton={true}
             >

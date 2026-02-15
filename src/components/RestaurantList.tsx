@@ -130,6 +130,9 @@ const RestaurantCard = React.memo<{
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
                 onPress={handlePress}
+                accessibilityLabel={`${restaurant.name}${restaurant.rating ? `, rated ${restaurant.rating}` : ''}`}
+                accessibilityRole="button"
+                accessibilityHint="Opens restaurant details"
             >
                 <View>
                     <ImageCarousel
@@ -170,19 +173,27 @@ const RestaurantCard = React.memo<{
                     )}
 
                     {restaurant.durations && restaurant.durations.length > 0 && (
-                        <View style={styles.travelRow}>
-                            {restaurant.durations.map((duration, i) => (
-                                <View key={i} style={styles.travelChip}>
-                                    <FontAwesome
-                                        name={travelIcon}
-                                        size={12}
-                                        color={PARTICIPANT_COLORS[i] || PARTICIPANT_COLORS[PARTICIPANT_COLORS.length - 1]}
-                                    />
-                                    <Text style={styles.travelChipText}>
-                                        {duration}
-                                    </Text>
-                                </View>
-                            ))}
+                        <View style={styles.travelRow} accessibilityRole="summary">
+                            {restaurant.durations.map((duration, i) => {
+                                const participantName = participants[i]?.name || `Person ${i + 1}`;
+                                const showName = participants.length > 2;
+                                return (
+                                    <View
+                                        key={i}
+                                        style={styles.travelChip}
+                                        accessibilityLabel={`${participantName}: ${duration} travel time`}
+                                    >
+                                        <FontAwesome
+                                            name={travelIcon}
+                                            size={12}
+                                            color={PARTICIPANT_COLORS[i] || PARTICIPANT_COLORS[PARTICIPANT_COLORS.length - 1]}
+                                        />
+                                        <Text style={styles.travelChipText}>
+                                            {showName ? `${participantName.split(' ')[0]}: ${duration}` : duration}
+                                        </Text>
+                                    </View>
+                                );
+                            })}
                         </View>
                     )}
                 </View>

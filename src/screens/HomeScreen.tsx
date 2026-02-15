@@ -85,7 +85,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                     AsyncStorage.getItem(STORAGE_KEYS.TRAVEL_MODE),
                     AsyncStorage.getItem(STORAGE_KEYS.CATEGORIES),
                 ]);
-                if (savedMode) {
+                const validTravelModes: TravelMode[] = ['driving', 'walking', 'transit', 'bicycling'];
+                if (savedMode && validTravelModes.includes(savedMode as TravelMode)) {
                     setTravelMode(savedMode as TravelMode);
                 }
                 if (savedCategories) {
@@ -327,7 +328,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
 
                 if (allRestaurants.length === 0) {
                     navigation.navigate('NoResults', {
-                        errorMessage: `No places found near the midpoint. Try different categories or locations.`
+                        errorMessage: ERROR_MESSAGES.NO_PLACES_FOUND,
                     });
                     setLoading(false);
                     return;
@@ -362,7 +363,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
 
             if (!optimizedRestaurants || optimizedRestaurants.length === 0) {
                 navigation.navigate('NoResults', {
-                    errorMessage: `No places found. Try different categories or locations.`
+                    errorMessage: ERROR_MESSAGES.NO_PLACES_FOUND_GENERIC,
                 });
                 setLoading(false);
                 return;
@@ -485,6 +486,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                                 style={styles.routeLocationRow}
                                                 onPress={handleChangeLocation}
                                                 activeOpacity={0.7}
+                                                accessibilityLabel="Your location"
+                                                accessibilityRole="button"
+                                                accessibilityHint="Tap to change your starting location"
                                             >
                                                 <Text style={styles.routeLocationText} numberOfLines={1} ellipsizeMode="tail">
                                                     {formatAddressForDisplay(userAddress || "Current Location")}
@@ -524,6 +528,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                                                 style={styles.removeParticipantButton}
                                                                 onPress={() => removeParticipant(index)}
                                                                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                                accessibilityLabel={`Remove participant ${index + 1}`}
+                                                                accessibilityRole="button"
+                                                                accessibilityHint="Removes this participant from the search"
                                                             >
                                                                 <Ionicons name="close-circle" size={22} color={COLORS.GRAY} />
                                                             </TouchableOpacity>
@@ -538,6 +545,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                                 style={styles.addParticipantButton}
                                                 onPress={addParticipant}
                                                 activeOpacity={0.7}
+                                                accessibilityLabel="Add person"
+                                                accessibilityRole="button"
+                                                accessibilityHint="Adds another participant to the search"
                                             >
                                                 <Ionicons name="add-circle-outline" size={20} color={COLORS.PRIMARY} />
                                                 <Text style={styles.addParticipantText}>Add person</Text>

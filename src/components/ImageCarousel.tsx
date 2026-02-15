@@ -127,7 +127,7 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(({
                         <FontAwesome
                             name={isSaved ? 'heart' : 'heart-o'}
                             size={20}
-                            color={isSaved ? '#FF385C' : COLORS.SURFACE}
+                            color={isSaved ? COLORS.HEART : COLORS.SURFACE}
                         />
                     </Animated.View>
                 </TouchableOpacity>

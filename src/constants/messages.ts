@@ -7,6 +7,8 @@ export const ERROR_MESSAGES = {
     GEOCODING_FAILED: 'Failed to convert address to coordinates. Please enter a valid address.',
     RESTAURANT_SEARCH_FAILED: 'Failed to find meeting places. Please try again.',
     NO_VENUES_FOUND: 'No venues found near the midpoint.',
+    NO_PLACES_FOUND: 'No places found near the midpoint. Try different categories or locations.',
+    NO_PLACES_FOUND_GENERIC: 'No places found. Try different categories or locations.',
     API_KEY_INVALID: 'API key is invalid or expired. Please check your configuration.',
     API_QUOTA_EXCEEDED: 'API request limit exceeded. Please try again later.',
     NETWORK_ERROR: 'Network error. Please check your internet connection and try again.',
