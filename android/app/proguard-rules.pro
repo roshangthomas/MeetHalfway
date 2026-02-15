@@ -29,9 +29,17 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
+# Google Play Services Base (required by react-native-maps)
+-keep class com.google.android.gms.common.** { *; }
+-keep interface com.google.android.gms.common.** { *; }
+
 # react-native-maps
 -keep class com.google.android.gms.maps.** { *; }
 -keep interface com.google.android.gms.maps.** { *; }
+
+# Google Play Services Location (required by react-native-maps + expo-location)
+-keep class com.google.android.gms.location.** { *; }
+-keep interface com.google.android.gms.location.** { *; }
 
 # Keep native methods
 -keepclassmembers class * {

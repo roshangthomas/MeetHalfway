@@ -63,7 +63,8 @@
         {
           "showTextLabel": false
         }
-      ]
+      ],
+      "./plugins/withPlayServicesLocation"
     ],
     "extra": {
       "eas": {
