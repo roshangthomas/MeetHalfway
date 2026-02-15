@@ -26,6 +26,7 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({
         }
     }, [onAnimationFinish, duration]);
 
+    // Optimize animation performance
     return (
         <View style={styles.container}>
             <Text style={styles.title}>Whats Halfway</Text>
@@ -35,6 +36,7 @@ export const AnimatedSplash: React.FC<AnimatedSplashProps> = ({
                 autoPlay
                 loop={false}
                 style={styles.animation}
+                speed={1.5} // Speed up animation
             />
             <Text style={styles.message}>{message}</Text>
         </View>
