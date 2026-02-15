@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
     View,
     StyleSheet,
@@ -7,10 +7,12 @@ import {
     Dimensions,
     NativeSyntheticEvent,
     NativeScrollEvent,
+    Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { FontAwesome } from '@expo/vector-icons';
 import { COLORS } from '../constants';
+import { hapticLight } from '../utils';
 
 const placeholderImage = require('../../assets/placeholder-restaurant.png');
 
@@ -37,7 +39,27 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(({
     showHeart = true,
 }) => {
     const [activeIndex, setActiveIndex] = useState(0);
+    const heartScale = useRef(new Animated.Value(1)).current;
     const imageWidth = width ?? SCREEN_WIDTH - CARD_HORIZONTAL_MARGIN * 2;
+
+    const handleToggleSave = useCallback(() => {
+        hapticLight();
+        Animated.sequence([
+            Animated.spring(heartScale, {
+                toValue: 1.3,
+                useNativeDriver: true,
+                speed: 50,
+                bounciness: 12,
+            }),
+            Animated.spring(heartScale, {
+                toValue: 1,
+                useNativeDriver: true,
+                speed: 50,
+                bounciness: 12,
+            }),
+        ]).start();
+        onToggleSave();
+    }, [heartScale, onToggleSave]);
 
     const images = photoUrls && photoUrls.length > 0
         ? photoUrls
@@ -98,14 +120,16 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(({
             {showHeart && (
                 <TouchableOpacity
                     style={styles.heartButton}
-                    onPress={onToggleSave}
+                    onPress={handleToggleSave}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <FontAwesome
-                        name={isSaved ? 'heart' : 'heart-o'}
-                        size={20}
-                        color={isSaved ? '#FF385C' : COLORS.SURFACE}
-                    />
+                    <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                        <FontAwesome
+                            name={isSaved ? 'heart' : 'heart-o'}
+                            size={20}
+                            color={isSaved ? '#FF385C' : COLORS.SURFACE}
+                        />
+                    </Animated.View>
                 </TouchableOpacity>
             )}
         </View>

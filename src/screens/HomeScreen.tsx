@@ -8,7 +8,8 @@ import {
     Platform,
     KeyboardAvoidingView,
     ActivityIndicator,
-    Dimensions,
+    LayoutAnimation,
+    UIManager,
 } from 'react-native';
 import { LocationInput } from '../components/LocationInput';
 import { TravelModePicker } from '../components/TravelModePicker';
@@ -20,12 +21,11 @@ import {
     calculateMidpoint,
     calculateRoadMidpoint,
     findOptimalMeetingPlaces,
-    LocationPermissionStatus
 } from '../services/location';
 import { searchRestaurants, getTravelInfo } from '../services/places';
-import { Location, Restaurant, TravelMode, PlaceCategory, RootStackParamList } from '../types';
+import { Location, Restaurant, TravelMode, PlaceCategory, Participant, RootStackParamList } from '../types';
 import { styles } from '../styles/App.styles';
-import { ERROR_MESSAGES, MAX_RESULTS } from '../constants';
+import { ERROR_MESSAGES, MAX_RESULTS, MAX_PARTICIPANTS, PARTICIPANT_COLORS } from '../constants';
 import { CategoryPicker } from '../components/CategoryPicker';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -33,15 +33,31 @@ import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 import { useLocationPermission } from '../hooks/useLocationPermission';
-import { formatAddressForDisplay, logger, resolveLocation, createRegionFromLocation } from '../utils';
+import { formatAddressForDisplay, logger, resolveLocation, createRegionFromLocation, hapticMedium, hapticLight } from '../utils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MapViewWrapper from '../components/MapViewWrapper';
 import { Marker, Region } from 'react-native-maps';
 
 type HomeScreenProps = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
+interface ParticipantEntry {
+    address: string;
+    placeId: string | null;
+}
+
+const STORAGE_KEYS = {
+    TRAVEL_MODE: '@meethalfway/travelMode',
+    CATEGORIES: '@meethalfway/categories',
+} as const;
+
+if (Platform.OS === 'android') {
+    UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => {
-    const [partnerAddress, setPartnerAddress] = useState<string | null>(null);
-    const [partnerPlaceId, setPartnerPlaceId] = useState<string | null>(null);
+    const [participants, setParticipants] = useState<ParticipantEntry[]>([
+        { address: '', placeId: null },
+    ]);
     const [userAddress, setUserAddress] = useState<string | null>(null);
     const [userLocation, setUserLocation] = useState<Location | null>(null);
     const [loading, setLoading] = useState(false);
@@ -59,7 +75,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
     } = useLocationPermission();
 
     const scrollViewRef = useRef<ScrollView>(null);
-    const partnerLocationInputRef = useRef<View>(null);
+    const preferencesLoaded = useRef(false);
+
+    // Load saved preferences on mount
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const [savedMode, savedCategories] = await Promise.all([
+                    AsyncStorage.getItem(STORAGE_KEYS.TRAVEL_MODE),
+                    AsyncStorage.getItem(STORAGE_KEYS.CATEGORIES),
+                ]);
+                if (savedMode) {
+                    setTravelMode(savedMode as TravelMode);
+                }
+                if (savedCategories) {
+                    const parsed = JSON.parse(savedCategories) as PlaceCategory[];
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setSelectedCategories(parsed);
+                    }
+                }
+            } catch (err) {
+                logger.warn('Failed to load saved preferences:', err);
+            } finally {
+                preferencesLoaded.current = true;
+            }
+        };
+        loadPreferences();
+    }, []);
+
+    // Persist travel mode when it changes
+    useEffect(() => {
+        if (!preferencesLoaded.current) return;
+        AsyncStorage.setItem(STORAGE_KEYS.TRAVEL_MODE, travelMode).catch((err) => {
+            logger.warn('Failed to save travel mode:', err);
+        });
+    }, [travelMode]);
+
+    // Persist categories when they change
+    useEffect(() => {
+        if (!preferencesLoaded.current) return;
+        AsyncStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(selectedCategories)).catch((err) => {
+            logger.warn('Failed to save categories:', err);
+        });
+    }, [selectedCategories]);
 
     useEffect(() => {
         if (route.params?.newLocation && route.params?.newAddress) {
@@ -165,13 +223,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         });
     };
 
+    const updateParticipant = (index: number, updates: Partial<ParticipantEntry>) => {
+        setParticipants(prev => {
+            const next = [...prev];
+            next[index] = { ...next[index], ...updates };
+            return next;
+        });
+    };
+
+    const addParticipant = () => {
+        if (participants.length < MAX_PARTICIPANTS - 1) {
+            hapticLight();
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+            setParticipants(prev => [...prev, { address: '', placeId: null }]);
+        }
+    };
+
+    const removeParticipant = (index: number) => {
+        hapticLight();
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setParticipants(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleSearch = async () => {
+        hapticMedium();
         if (!userLocation) {
             setError(ERROR_MESSAGES.USER_LOCATION_UNAVAILABLE);
             return;
         }
 
-        if (!partnerAddress || !partnerAddress.trim()) {
+        const emptyParticipant = participants.find(p => !p.address.trim());
+        if (emptyParticipant) {
             setError(ERROR_MESSAGES.PARTNER_LOCATION_INVALID);
             return;
         }
@@ -180,32 +262,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         setError(null);
 
         try {
-            let partnerLoc: Location;
-            try {
-                partnerLoc = await resolveLocation(partnerAddress, partnerPlaceId);
-            } catch (geocodeError) {
-                if (geocodeError instanceof Error) {
-                    setError(geocodeError.message);
-                } else {
-                    setError(ERROR_MESSAGES.GEOCODING_FAILED);
+            const resolvedLocations: Location[] = [];
+            for (const p of participants) {
+                try {
+                    const loc = await resolveLocation(p.address, p.placeId);
+                    resolvedLocations.push(loc);
+                } catch (geocodeError) {
+                    if (geocodeError instanceof Error) {
+                        setError(geocodeError.message);
+                    } else {
+                        setError(ERROR_MESSAGES.GEOCODING_FAILED);
+                    }
+                    setLoading(false);
+                    return;
                 }
-                setLoading(false);
-                return;
             }
+
+            const allLocations = [userLocation, ...resolvedLocations];
+
+            const allParticipants: Participant[] = [
+                { name: 'You', address: userAddress || 'Current Location', location: userLocation },
+                ...participants.map((p, i) => ({
+                    name: participants.length === 1 ? 'Them' : `Them ${i + 1}`,
+                    address: p.address,
+                    placeId: p.placeId,
+                    location: resolvedLocations[i],
+                })),
+            ];
 
             let midpoint: Location;
             try {
-                midpoint = await calculateRoadMidpoint(userLocation, partnerLoc);
+                midpoint = await calculateRoadMidpoint(allLocations);
             } catch (midpointError) {
                 logger.warn('Road midpoint calculation failed, falling back to simple midpoint', midpointError);
-                midpoint = calculateMidpoint(userLocation, partnerLoc);
+                midpoint = calculateMidpoint(allLocations);
             }
 
             let optimizedRestaurants: Restaurant[] | undefined;
             try {
                 optimizedRestaurants = await findOptimalMeetingPlaces(
-                    userLocation,
-                    partnerLoc,
+                    allLocations,
                     travelMode,
                     selectedCategories,
                     MAX_RESULTS.RESTAURANTS
@@ -274,8 +370,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
 
             navigation.navigate('Results', {
                 restaurants: optimizedRestaurants,
-                userLocation: userLocation,
-                partnerLocation: partnerLoc,
+                participants: allParticipants,
                 midpointLocation: midpoint,
                 travelMode: travelMode,
             });
@@ -289,22 +384,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
         }
     };
 
-    const handlePartnerLocationFocus = () => {
-        setTimeout(() => {
-            if (partnerLocationInputRef.current && scrollViewRef.current) {
-                partnerLocationInputRef.current.measureInWindow((x, y, width, height) => {
-                    const yOffset = y + 150;
-                    scrollViewRef.current?.scrollTo({ y: yOffset, animated: true });
-                });
-            }
-        }, 300);
-    };
-
     const handlePreciseLocationPrompt = () => {
         promptForPreciseLocation((location) => {
             setUserLocation(location);
         });
     };
+
+    const allParticipantsHaveAddress = participants.every(p => p.address.trim().length > 0);
 
     return (
         <ErrorBoundary>
@@ -393,7 +479,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                     <>
                                         <View style={styles.routeRow}>
                                             <View style={styles.routeDotContainer}>
-                                                <View style={[styles.routeDot, styles.routeDotOrigin]} />
+                                                <View style={[styles.routeDot, { backgroundColor: PARTICIPANT_COLORS[0] }]} />
                                             </View>
                                             <TouchableOpacity
                                                 style={styles.routeLocationRow}
@@ -407,33 +493,56 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                             </TouchableOpacity>
                                         </View>
 
-                                        <View style={styles.routeConnector}>
-                                            <View style={styles.routeDotSmall} />
-                                            <View style={styles.routeDotSmall} />
-                                            <View style={styles.routeDotSmall} />
-                                        </View>
+                                        {participants.map((participant, index) => (
+                                            <React.Fragment key={index}>
+                                                <View style={styles.routeConnector}>
+                                                    <View style={styles.routeDotSmall} />
+                                                    <View style={styles.routeDotSmall} />
+                                                    <View style={styles.routeDotSmall} />
+                                                </View>
 
-                                        <View style={styles.routeRow}>
-                                            <View style={styles.routeDotContainer}>
-                                                <View style={[styles.routeDot, styles.routeDotDestination]} />
-                                            </View>
-                                            <View ref={partnerLocationInputRef} style={styles.routeInputArea}>
-                                                <LocationInput
-                                                    value={partnerAddress || ''}
-                                                    onChangeText={(text) => {
-                                                        setPartnerAddress(text);
-                                                        setPartnerPlaceId(null);
-                                                    }}
-                                                    onPlaceSelected={(placeId, description) => {
-                                                        setPartnerPlaceId(placeId);
-                                                        setPartnerAddress(description);
-                                                    }}
-                                                    placeholder="Enter partner's location..."
-                                                    onInputFocus={handlePartnerLocationFocus}
-                                                    userLocation={userLocation}
-                                                />
-                                            </View>
-                                        </View>
+                                                <View style={styles.routeRow}>
+                                                    <View style={styles.routeDotContainer}>
+                                                        <View style={[styles.routeDot, { backgroundColor: PARTICIPANT_COLORS[index + 1] || PARTICIPANT_COLORS[PARTICIPANT_COLORS.length - 1] }]} />
+                                                    </View>
+                                                    <View style={styles.participantInputGroup}>
+                                                        <View style={styles.participantLocationInput}>
+                                                            <LocationInput
+                                                                value={participant.address}
+                                                                onChangeText={(text) => {
+                                                                    updateParticipant(index, { address: text, placeId: null });
+                                                                }}
+                                                                onPlaceSelected={(placeId, description) => {
+                                                                    updateParticipant(index, { placeId, address: description });
+                                                                }}
+                                                                placeholder="Enter location..."
+                                                                userLocation={userLocation}
+                                                            />
+                                                        </View>
+                                                        {participants.length > 1 && (
+                                                            <TouchableOpacity
+                                                                style={styles.removeParticipantButton}
+                                                                onPress={() => removeParticipant(index)}
+                                                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                            >
+                                                                <Ionicons name="close-circle" size={22} color={COLORS.GRAY} />
+                                                            </TouchableOpacity>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                            </React.Fragment>
+                                        ))}
+
+                                        {participants.length < MAX_PARTICIPANTS - 1 && (
+                                            <TouchableOpacity
+                                                style={styles.addParticipantButton}
+                                                onPress={addParticipant}
+                                                activeOpacity={0.7}
+                                            >
+                                                <Ionicons name="add-circle-outline" size={20} color={COLORS.PRIMARY} />
+                                                <Text style={styles.addParticipantText}>Add person</Text>
+                                            </TouchableOpacity>
+                                        )}
                                     </>
                                 )}
                             </View>
@@ -457,12 +566,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ navigation, route }) => 
                                     <TouchableOpacity
                                         style={[
                                             styles.findButton,
-                                            (!partnerAddress || loading) && styles.buttonDisabled
+                                            (!allParticipantsHaveAddress || loading) && styles.buttonDisabled
                                         ]}
                                         onPress={handleSearch}
-                                        disabled={loading || !partnerAddress}
+                                        disabled={loading || !allParticipantsHaveAddress}
                                         accessibilityLabel="Find meeting places"
-                                        accessibilityHint="Searches for places between your location and your partner's location"
+                                        accessibilityHint="Searches for places between all participants"
                                         accessibilityRole="button"
                                     >
                                         <Text style={styles.findButtonText}>

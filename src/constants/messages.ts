@@ -3,7 +3,7 @@ export const ERROR_MESSAGES = {
     LOCATION_SERVICES: 'Failed to get your location. Please enable location services.',
     LOCATION_PERMISSION_DENIED: 'Location permission was denied. Please enable location services to use this feature or set your location manually.',
     LOCATION_PRECISION_LIMITED: 'Using approximate location. For better accuracy, enable precise location in settings.',
-    PARTNER_LOCATION_INVALID: 'Unable to find your partner\'s location. Please enter a valid address.',
+    PARTNER_LOCATION_INVALID: 'Unable to find that location. Please enter a valid address.',
     GEOCODING_FAILED: 'Failed to convert address to coordinates. Please enter a valid address.',
     RESTAURANT_SEARCH_FAILED: 'Failed to find meeting places. Please try again.',
     NO_VENUES_FOUND: 'No venues found near the midpoint.',

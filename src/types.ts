@@ -3,6 +3,13 @@ export interface Location {
     longitude: number;
 }
 
+export interface Participant {
+    name: string;
+    address: string;
+    placeId?: string | null;
+    location: Location | null;
+}
+
 export interface Restaurant {
     id: string;
     name: string;
@@ -17,16 +24,13 @@ export interface Restaurant {
     totalRatings?: number;
     priceLevel?: number;
     types?: string[];
-    travelTimeA?: number;
-    travelTimeB?: number;
-    timeDifference?: number;
+    travelTimes?: number[];
+    distances?: string[];
+    durations?: string[];
+    maxTimeDifference?: number;
     totalTravelTime?: number;
     fairnessScore?: number;
     score?: number;
-    distanceA?: string;
-    durationA?: string;
-    distanceB?: string;
-    durationB?: string;
     phoneNumber?: string;
     businessHours?: string[];
     editorialSummary?: string;
@@ -58,15 +62,13 @@ export type RootStackParamList = {
     } | undefined;
     Results: {
         restaurants: Restaurant[];
-        userLocation: Location;
-        partnerLocation: Location;
+        participants: Participant[];
         midpointLocation: Location;
         travelMode: TravelMode;
     };
     RestaurantDetail: {
         restaurant: Restaurant;
-        userLocation: Location;
-        partnerLocation: Location;
+        participants: Participant[];
         travelMode: TravelMode;
     };
     NoResults: {

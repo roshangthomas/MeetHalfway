@@ -5,18 +5,16 @@ import { SortOption, RootStackParamList } from '../types';
 import { styles } from '../styles/Results.styles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS } from '../constants';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome, AntDesign } from '@expo/vector-icons';
+import { hapticSelection } from '../utils';
 import { FilterModal, FilterOptions } from '../components/FilterModal';
-import { FontAwesome } from '@expo/vector-icons';
-import { AntDesign } from '@expo/vector-icons';
 import { SortModal } from '../components/SortModal';
 import * as Font from 'expo-font';
-import { parseDurationToMinutes } from '../utils/duration';
 
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
 export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation }) => {
-    const { restaurants, userLocation, partnerLocation, midpointLocation, travelMode } = route.params;
+    const { restaurants, participants, midpointLocation, travelMode } = route.params;
     const [sortOption, setSortOption] = useState<SortOption>('distance');
     const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
     const [isSortModalVisible, setIsSortModalVisible] = useState(false);
@@ -61,15 +59,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 case 'price':
                     return (a.priceLevel || 0) - (b.priceLevel || 0);
                 case 'travelTimeDiff':
-                    const aUserTime = a.durationA ? parseDurationToMinutes(a.durationA) : 0;
-                    const aFriendTime = a.durationB ? parseDurationToMinutes(a.durationB) : 0;
-                    const aDiff = Math.abs(aUserTime - aFriendTime);
-
-                    const bUserTime = b.durationA ? parseDurationToMinutes(b.durationA) : 0;
-                    const bFriendTime = b.durationB ? parseDurationToMinutes(b.durationB) : 0;
-                    const bDiff = Math.abs(bUserTime - bFriendTime);
-
-                    return aDiff - bDiff;
+                    return (a.maxTimeDifference || 0) - (b.maxTimeDifference || 0);
                 case 'distance':
                 default:
                     const aDistance = a.distance ? parseFloat(a.distance.replace(/[^0-9.]/g, '')) : 0;
@@ -118,14 +108,12 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
-                {/* Pill chip filter/sort bar */}
                 <View style={styles.filterSortBar}>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.pillScrollContent}
                     >
-                        {/* Filters pill */}
                         <TouchableOpacity
                             style={[
                                 styles.pillChip,
@@ -146,7 +134,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Sort pill */}
                         <TouchableOpacity
                             style={[
                                 styles.pillChip,
@@ -172,13 +159,13 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                             />
                         </TouchableOpacity>
 
-                        {/* Quick filter: Rating 4+ */}
                         <TouchableOpacity
                             style={[
                                 styles.pillChip,
                                 filters.minRating >= 4 && styles.pillChipActive,
                             ]}
                             onPress={() => {
+                                hapticSelection();
                                 setFilters(prev => ({
                                     ...prev,
                                     minRating: prev.minRating >= 4 ? 0 : 4,
@@ -198,13 +185,13 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                             </Text>
                         </TouchableOpacity>
 
-                        {/* Quick filter: $$ (price ≤ 2) */}
                         <TouchableOpacity
                             style={[
                                 styles.pillChip,
                                 filters.maxPrice <= 2 && styles.pillChipActive,
                             ]}
                             onPress={() => {
+                                hapticSelection();
                                 setFilters(prev => ({
                                     ...prev,
                                     maxPrice: prev.maxPrice <= 2 ? 4 : 2,
@@ -225,8 +212,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                     {sortedAndFilteredRestaurants.length > 0 ? (
                         <RestaurantList
                             restaurants={sortedAndFilteredRestaurants}
-                            userLocation={userLocation}
-                            partnerLocation={partnerLocation}
+                            participants={participants}
                             travelMode={travelMode}
                         />
                     ) : (

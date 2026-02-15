@@ -274,4 +274,32 @@ export const styles = StyleSheet.create({
         fontSize: 13,
         color: COLORS.WARNING_BANNER_TEXT,
     },
+
+    // --- Participant input group ---
+    participantInputGroup: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: SPACING.SMALL,
+        gap: 6,
+    },
+    participantLocationInput: {
+        flex: 1,
+    },
+    removeParticipantButton: {
+        padding: 4,
+    },
+    addParticipantButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        marginTop: SPACING.SMALL,
+    },
+    addParticipantText: {
+        fontSize: 14,
+        color: COLORS.PRIMARY,
+        fontWeight: '600',
+    },
 });

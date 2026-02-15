@@ -30,7 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.whatshalfway",
-      "versionCode": 15,
+      "versionCode": 16,
       "config": {
         "googleMaps": {
           "apiKey": "${GOOGLE_MAPS_API_KEY}"

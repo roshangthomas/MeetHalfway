@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { Ionicons } from '@expo/vector-icons';
 import { PlaceCategory, PLACE_CATEGORY_LABELS, MIN_CATEGORIES, MAX_CATEGORIES } from '../types';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../constants';
+import { hapticSelection } from '../utils';
 
 interface CategoryPickerProps {
     selectedCategories: PlaceCategory[];
@@ -27,10 +28,12 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
     const handleToggleCategory = (category: PlaceCategory) => {
         if (selectedCategories.includes(category)) {
             if (selectedCategories.length > MIN_CATEGORIES) {
+                hapticSelection();
                 onCategoriesChange(selectedCategories.filter(c => c !== category));
             }
         } else {
             if (selectedCategories.length < MAX_CATEGORIES) {
+                hapticSelection();
                 onCategoriesChange([...selectedCategories, category]);
             }
         }

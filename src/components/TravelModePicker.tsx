@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TravelMode } from '../types';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../constants';
+import { hapticSelection } from '../utils';
 
 interface TravelModePickerProps {
     selectedMode: TravelMode;
@@ -34,7 +35,10 @@ export const TravelModePicker: React.FC<TravelModePickerProps> = ({
                             styles.modeButton,
                             isSelected && styles.selectedMode,
                         ]}
-                        onPress={() => onModeChange(mode)}
+                        onPress={() => {
+                            hapticSelection();
+                            onModeChange(mode);
+                        }}
                     >
                         <Ionicons
                             name={isSelected ? config.icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap : config.icon}
