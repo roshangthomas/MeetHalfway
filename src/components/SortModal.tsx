@@ -12,6 +12,7 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZES } from '../constants';
 import { SortOption } from '../types';
+import { hapticSelection } from '../utils';
 
 interface SortModalProps {
     visible: boolean;
@@ -56,7 +57,10 @@ export const SortModal: React.FC<SortModalProps> = ({
                                     <TouchableOpacity
                                         key={option.value}
                                         style={styles.optionItem}
-                                        onPress={() => onApply(option.value)}
+                                        onPress={() => {
+                                            hapticSelection();
+                                            onApply(option.value);
+                                        }}
                                     >
                                         <View style={styles.optionContent}>
                                             <FontAwesome name={option.icon} size={20} color={COLORS.TEXT} style={styles.optionIcon} />

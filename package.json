@@ -1,12 +1,22 @@
 {
   "name": "whatshalfway",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "validate:android": "node scripts/validate-android.js",
+    "prebuild:dev": "node scripts/validate-android.js",
+    "prebuild:preview": "node scripts/validate-android.js",
+    "prebuild:prod": "node scripts/validate-android.js",
+    "prebuild:submit": "node scripts/validate-android.js",
+    "build:dev": "eas build --profile development --platform android",
+    "build:preview": "eas build --profile preview --platform android",
+    "build:prod": "eas build --profile production --platform android",
+    "submit:android": "eas submit --platform android",
+    "build:submit": "eas build --profile production --platform android --auto-submit"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
@@ -32,7 +42,8 @@
     "react-native-safe-area-context": "4.12.0",
     "react-native-screens": "~4.4.0",
     "vector-icons": "^0.1.0",
-    "expo-image": "~2.0.7"
+    "expo-image": "~2.0.7",
+    "expo-haptics": "~14.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

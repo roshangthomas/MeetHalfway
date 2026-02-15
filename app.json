@@ -2,7 +2,7 @@
   "expo": {
     "name": "Whats Halfway",
     "slug": "whatshalfway",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -30,7 +30,6 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.whatshalfway",
-      "versionCode": 15,
       "config": {
         "googleMaps": {
           "apiKey": "${GOOGLE_MAPS_API_KEY}"
@@ -50,6 +49,11 @@
         {
           "ios": {
             "useFrameworks": "static"
+          },
+          "android": {
+            "minSdkVersion": 24,
+            "targetSdkVersion": 35,
+            "compileSdkVersion": 35
           }
         }
       ],
@@ -59,14 +63,9 @@
         {
           "showTextLabel": false
         }
-      ]
+      ],
+      "./plugins/withPlayServicesLocation"
     ],
-    "packagerOpts": {
-      "assetExts": [
-        "ttf",
-        "otf"
-      ]
-    },
     "extra": {
       "eas": {
         "projectId": "9903bdb9-a4d8-4053-9b23-b15d3d769422"

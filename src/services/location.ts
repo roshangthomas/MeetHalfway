@@ -143,17 +143,21 @@ export const geocodeAddress = async (address: string): Promise<LocationType> => 
     }
 };
 
-export const calculateMidpoint = (locationA: LocationType, locationB: LocationType): LocationType => {
-    return {
-        latitude: (locationA.latitude + locationB.latitude) / 2,
-        longitude: (locationA.longitude + locationB.longitude) / 2,
-    };
+export const calculateMidpoint = (locations: LocationType[]): LocationType => {
+    const lat = locations.reduce((s, l) => s + l.latitude, 0) / locations.length;
+    const lng = locations.reduce((s, l) => s + l.longitude, 0) / locations.length;
+    return { latitude: lat, longitude: lng };
 };
 
 export const calculateRoadMidpoint = async (
-    locationA: LocationType,
-    locationB: LocationType
+    locations: LocationType[]
 ): Promise<LocationType> => {
+    // Road midpoint only makes sense for 2 points; for 3+ use geometric centroid
+    if (locations.length !== 2) {
+        return calculateMidpoint(locations);
+    }
+
+    const [locationA, locationB] = locations;
     try {
         const response = await googleMapsClient.get<GoogleDirectionsResponse>(
             ENDPOINTS.directions,
@@ -200,10 +204,10 @@ export const calculateRoadMidpoint = async (
         }
 
         logger.warn('Could not find exact road midpoint, falling back to simple midpoint');
-        return calculateMidpoint(locationA, locationB);
+        return calculateMidpoint(locations);
     } catch (error) {
         logger.error('Error calculating road midpoint:', error);
-        return calculateMidpoint(locationA, locationB);
+        return calculateMidpoint(locations);
     }
 };
 
@@ -235,8 +239,7 @@ const searchNearbyVenues = async (
 };
 
 export const findOptimalMeetingPlaces = async (
-    locationA: LocationType,
-    locationB: LocationType,
+    locations: LocationType[],
     travelMode: TravelMode,
     categories: PlaceCategory[],
     maxResults: number = 20
@@ -244,10 +247,10 @@ export const findOptimalMeetingPlaces = async (
     try {
         let midpoint: LocationType;
         try {
-            midpoint = await findPracticalMidpoint(locationA, locationB, travelMode);
+            midpoint = await findPracticalMidpoint(locations, travelMode);
         } catch (error) {
             logger.warn('Practical midpoint calculation failed, falling back to simple midpoint', error);
-            midpoint = calculateMidpoint(locationA, locationB);
+            midpoint = calculateMidpoint(locations);
         }
 
         let allVenues: Restaurant[] = [];
@@ -305,8 +308,7 @@ export const findOptimalMeetingPlaces = async (
 
         logger.info(`Fetching batch travel info for ${venueLocations.length} venues`);
         const travelResults = await getBatchTravelInfo(
-            locationA,
-            locationB,
+            locations,
             venueLocations,
             travelMode
         );
@@ -322,42 +324,40 @@ export const findOptimalMeetingPlaces = async (
             if (!travel) {
                 return {
                     ...venue,
-                    travelTimeA: 9999,
-                    travelTimeB: 9999,
-                    timeDifference: 9999,
+                    travelTimes: locations.map(() => 9999),
+                    distances: locations.map(() => 'Unknown'),
+                    durations: locations.map(() => 'Unknown'),
+                    maxTimeDifference: 9999,
                     totalTravelTime: 9999,
                     fairnessScore: 0,
                     score: 0,
-                    distanceA: 'Unknown',
-                    durationA: 'Unknown',
-                    distanceB: 'Unknown',
-                    durationB: 'Unknown',
                     distance: 'Unknown',
                     duration: 'Unknown',
                 };
             }
 
-            const timeDifference = Math.abs(travel.travelTimeA - travel.travelTimeB);
-            const fairnessScore = 100 - Math.min(timeDifference, 100);
+            const maxTime = Math.max(...travel.travelTimes);
+            const minTime = Math.min(...travel.travelTimes);
+            const maxTimeDifference = maxTime - minTime;
+            const totalTravelTime = travel.travelTimes.reduce((a, b) => a + b, 0);
+
+            const fairnessScore = 100 - Math.min(maxTimeDifference, 100);
             const ratingScore = (venue.rating || 3) * 20;
-            const totalTimeScore = 100 - Math.min((travel.travelTimeA + travel.travelTimeB) / 2, 100);
+            const totalTimeScore = 100 - Math.min(totalTravelTime / locations.length, 100);
 
             const score = (fairnessScore * 0.5) + (ratingScore * 0.3) + (totalTimeScore * 0.2);
 
             return {
                 ...venue,
-                travelTimeA: travel.travelTimeA,
-                travelTimeB: travel.travelTimeB,
-                timeDifference,
-                totalTravelTime: travel.travelTimeA + travel.travelTimeB,
+                travelTimes: travel.travelTimes,
+                distances: travel.distances,
+                durations: travel.durations,
+                maxTimeDifference,
+                totalTravelTime,
                 fairnessScore,
                 score,
-                distanceA: travel.distanceA,
-                durationA: travel.durationA,
-                distanceB: travel.distanceB,
-                durationB: travel.durationB,
-                distance: travel.distanceA,
-                duration: travel.durationA,
+                distance: travel.distances[0],
+                duration: travel.durations[0],
             };
         });
 
@@ -371,17 +371,16 @@ export const findOptimalMeetingPlaces = async (
 };
 
 export const findPracticalMidpoint = async (
-    locationA: LocationType,
-    locationB: LocationType,
+    locations: LocationType[],
     travelMode: TravelMode = 'driving'
 ): Promise<LocationType> => {
     try {
         let roadMidpoint: LocationType;
         try {
-            roadMidpoint = await calculateRoadMidpoint(locationA, locationB);
+            roadMidpoint = await calculateRoadMidpoint(locations);
         } catch (error) {
             logger.warn('Road midpoint calculation failed, falling back to simple midpoint', error);
-            roadMidpoint = calculateMidpoint(locationA, locationB);
+            roadMidpoint = calculateMidpoint(locations);
         }
 
         const venueTypes = [
@@ -412,8 +411,7 @@ export const findPracticalMidpoint = async (
         }));
 
         const travelResults = await getBatchTravelInfo(
-            locationA,
-            locationB,
+            locations,
             venueLocations,
             travelMode
         );
@@ -425,8 +423,10 @@ export const findPracticalMidpoint = async (
                 longitude: venue.geometry.location.lng,
             };
 
-            const timeDifference = Math.abs(travel.travelTimeA - travel.travelTimeB);
-            const totalTravelTime = travel.travelTimeA + travel.travelTimeB;
+            const maxTime = Math.max(...travel.travelTimes);
+            const minTime = Math.min(...travel.travelTimes);
+            const timeDifference = maxTime - minTime;
+            const totalTravelTime = travel.travelTimes.reduce((a, b) => a + b, 0);
 
             const rating = venue.rating || 3;
             const userRatingsTotal = venue.user_ratings_total || 0;
@@ -436,7 +436,7 @@ export const findPracticalMidpoint = async (
             ) || false;
 
             const fairnessScore = 100 - Math.min(timeDifference, 100);
-            const travelTimeScore = 100 - Math.min(totalTravelTime / 2, 100);
+            const travelTimeScore = 100 - Math.min(totalTravelTime / locations.length, 100);
             const qualityScore = Math.min((rating * 20) * (Math.min(userRatingsTotal, 100) / 100), 100);
             const accessibilityScore = isOnMajorRoad ? 100 : 50;
 
@@ -459,6 +459,6 @@ export const findPracticalMidpoint = async (
         return scoredVenues.length > 0 ? scoredVenues[0].location : roadMidpoint;
     } catch (error) {
         logger.error('Error finding practical midpoint:', error);
-        return calculateMidpoint(locationA, locationB);
+        return calculateMidpoint(locations);
     }
 };

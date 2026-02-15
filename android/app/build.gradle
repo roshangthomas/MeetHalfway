@@ -98,7 +98,7 @@ android {
         applicationId "com.whatshalfway"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
+        versionCode 12 // Overridden by EAS autoIncrement (appVersionSource: "remote")
         versionName "1.0"
 
         // Add the Google Maps API key from environment variable
@@ -113,10 +113,18 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file('whatshalfway-release.keystore')
-            storePassword 'jackthecat1'
-            keyAlias 'whatshalfway'
-            keyPassword 'jackthecat1'
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'] ?: 'whatshalfway-release.keystore')
+                storePassword keystoreProperties['storePassword'] ?: System.getenv("KEYSTORE_PASSWORD") ?: ''
+                keyAlias keystoreProperties['keyAlias'] ?: System.getenv("KEY_ALIAS") ?: ''
+                keyPassword keystoreProperties['keyPassword'] ?: System.getenv("KEY_PASSWORD") ?: ''
+            } else if (System.getenv("KEYSTORE_PASSWORD")) {
+                // EAS builds: use environment variables when keystore.properties is not present
+                storeFile file('whatshalfway-release.keystore')
+                storePassword System.getenv("KEYSTORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
         }
     }
     buildTypes {
@@ -124,13 +132,12 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig signingConfigs.release
+            // Falls back to debug signing if release keystore is not configured
+            signingConfig keystorePropertiesFile.exists() || System.getenv("KEYSTORE_PASSWORD") ? signingConfigs.release : signingConfigs.debug
             shrinkResources true
             minifyEnabled enableProguardInReleaseBuilds
-            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            crunchPngs true
-            // Add optimizer flags 
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            crunchPngs true
         }
     }
     packagingOptions {

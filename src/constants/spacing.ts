@@ -21,5 +21,6 @@ export const BORDER_RADIUS = {
     MEDIUM: 8,
     LARGE: 12,
     XL: 16,
+    XXL: 24,
     ROUND: 999,
 } as const;

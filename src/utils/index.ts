@@ -32,3 +32,5 @@ export { generateSessionToken } from './sessionToken';
 export { buildPhotoUrl } from './photos';
 export { resolveLocation } from './geocoding';
 export { createRegionFromLocation } from './mapRegion';
+export { haversineDistance } from './geo';
+export { hapticLight, hapticMedium, hapticSuccess, hapticSelection } from './haptics';

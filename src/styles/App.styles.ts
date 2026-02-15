@@ -19,8 +19,8 @@ export const styles = StyleSheet.create({
     mapContainer: {
         height: height * 0.18,
         width: '100%',
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        borderBottomLeftRadius: BORDER_RADIUS.XXL,
+        borderBottomRightRadius: BORDER_RADIUS.XXL,
         overflow: 'hidden',
     },
     map: {
@@ -33,8 +33,8 @@ export const styles = StyleSheet.create({
         backgroundColor: COLORS.GRAY_LIGHT,
         justifyContent: 'center',
         alignItems: 'center',
-        borderBottomLeftRadius: 24,
-        borderBottomRightRadius: 24,
+        borderBottomLeftRadius: BORDER_RADIUS.XXL,
+        borderBottomRightRadius: BORDER_RADIUS.XXL,
     },
 
     routeCard: {
@@ -273,5 +273,33 @@ export const styles = StyleSheet.create({
         marginLeft: SPACING.SMALL,
         fontSize: 13,
         color: COLORS.WARNING_BANNER_TEXT,
+    },
+
+    // --- Participant input group ---
+    participantInputGroup: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: SPACING.SMALL,
+        gap: 6,
+    },
+    participantLocationInput: {
+        flex: 1,
+    },
+    removeParticipantButton: {
+        padding: 4,
+    },
+    addParticipantButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        marginTop: SPACING.SMALL,
+    },
+    addParticipantText: {
+        fontSize: 14,
+        color: COLORS.PRIMARY,
+        fontWeight: '600',
     },
 });

@@ -4,31 +4,44 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "env": {
+        "EXPO_PUBLIC_APP_VARIANT": "production"
+      }
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
-        "GOOGLE_MAPS_API_KEY": "GOOGLE_MAPS_API_KEY"
+        "EXPO_PUBLIC_APP_VARIANT": "development"
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
-      "env": {
-        "GOOGLE_MAPS_API_KEY": "GOOGLE_MAPS_API_KEY"
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle",
         "gradleCommand": ":app:bundleRelease"
-      },
-      "env": {
-        "GOOGLE_MAPS_API_KEY": "GOOGLE_MAPS_API_KEY"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./playstore.json",
+        "track": "internal"
+      }
+    }
   }
 }

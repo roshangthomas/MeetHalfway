@@ -21,12 +21,9 @@ interface DistanceMatrixResponse {
 
 export interface BatchTravelResult {
     venueId: string;
-    travelTimeA: number;
-    travelTimeB: number;
-    distanceA: string;
-    distanceB: string;
-    durationA: string;
-    durationB: string;
+    travelTimes: number[];
+    distances: string[];
+    durations: string[];
 }
 
 export interface VenueLocation {
@@ -41,8 +38,7 @@ const formatLocation = (location: Location): string =>
     `${location.latitude},${location.longitude}`;
 
 export const getBatchTravelInfo = async (
-    locationA: Location,
-    locationB: Location,
+    origins: Location[],
     venues: VenueLocation[],
     mode: TravelMode
 ): Promise<BatchTravelResult[]> => {
@@ -57,19 +53,16 @@ export const getBatchTravelInfo = async (
         const batch = venues.slice(i, i + BATCH_SIZE);
 
         try {
-            const batchResults = await processBatch(locationA, locationB, batch, mode);
+            const batchResults = await processBatch(origins, batch, mode);
             results.push(...batchResults);
         } catch (error) {
             logger.error(`Error processing batch ${i / BATCH_SIZE + 1}:`, error);
             batch.forEach((venue) => {
                 results.push({
                     venueId: venue.id,
-                    travelTimeA: 9999,
-                    travelTimeB: 9999,
-                    distanceA: 'Unknown',
-                    distanceB: 'Unknown',
-                    durationA: 'Unknown',
-                    durationB: 'Unknown',
+                    travelTimes: origins.map(() => 9999),
+                    distances: origins.map(() => 'Unknown'),
+                    durations: origins.map(() => 'Unknown'),
                 });
             });
         }
@@ -79,19 +72,18 @@ export const getBatchTravelInfo = async (
 };
 
 const processBatch = async (
-    locationA: Location,
-    locationB: Location,
+    origins: Location[],
     venues: VenueLocation[],
     mode: TravelMode
 ): Promise<BatchTravelResult[]> => {
-    const origins = `${formatLocation(locationA)}|${formatLocation(locationB)}`;
+    const originsStr = origins.map(formatLocation).join('|');
     const destinations = venues.map((v) => `${v.latitude},${v.longitude}`).join('|');
 
-    logger.info(`Distance Matrix: Processing ${venues.length} venues`);
+    logger.info(`Distance Matrix: Processing ${venues.length} venues for ${origins.length} origins`);
 
     const response = await googleMapsClient.get<DistanceMatrixResponse>(
         ENDPOINTS.distanceMatrix,
-        { origins, destinations, mode },
+        { origins: originsStr, destinations, mode },
         { cacheTTL: CACHE_TTL.DISTANCE_MATRIX }
     );
 
@@ -99,24 +91,21 @@ const processBatch = async (
         throw new Error(`Distance Matrix API returned status: ${response.status}`);
     }
 
-    const fromA = response.rows[0]?.elements || [];
-    const fromB = response.rows[1]?.elements || [];
+    return venues.map((venue, venueIndex) => {
+        const travelTimes: number[] = [];
+        const distances: string[] = [];
+        const durations: string[] = [];
 
-    return venues.map((venue, index) => {
-        const elementA = fromA[index];
-        const elementB = fromB[index];
-        const isValidA = elementA?.status === 'OK';
-        const isValidB = elementB?.status === 'OK';
+        for (let originIndex = 0; originIndex < origins.length; originIndex++) {
+            const element = response.rows[originIndex]?.elements[venueIndex];
+            const isValid = element?.status === 'OK';
 
-        return {
-            venueId: venue.id,
-            travelTimeA: isValidA ? secondsToMinutes(elementA.duration?.value || 0) : 9999,
-            travelTimeB: isValidB ? secondsToMinutes(elementB.duration?.value || 0) : 9999,
-            distanceA: isValidA ? elementA.distance?.text || 'Unknown' : 'Unknown',
-            distanceB: isValidB ? elementB.distance?.text || 'Unknown' : 'Unknown',
-            durationA: isValidA ? elementA.duration?.text || 'Unknown' : 'Unknown',
-            durationB: isValidB ? elementB.duration?.text || 'Unknown' : 'Unknown',
-        };
+            travelTimes.push(isValid ? secondsToMinutes(element.duration?.value || 0) : 9999);
+            distances.push(isValid ? element.distance?.text || 'Unknown' : 'Unknown');
+            durations.push(isValid ? element.duration?.text || 'Unknown' : 'Unknown');
+        }
+
+        return { venueId: venue.id, travelTimes, distances, durations };
     });
 };
 

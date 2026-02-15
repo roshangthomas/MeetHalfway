@@ -14,6 +14,7 @@ import {
 import { FontAwesome } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { hapticLight } from '../utils';
 
 export interface FilterOptions {
     minRating: number;
@@ -47,6 +48,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     }, [initialFilters]);
 
     const handleReset = () => {
+        hapticLight();
         setFilters({
             minRating: 0,
             minReviews: 0,
@@ -260,6 +262,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                                         if (filters.minReviews < 0) {
                                             return;
                                         }
+                                        hapticLight();
                                         onApply(filters);
                                     }}
                                 >

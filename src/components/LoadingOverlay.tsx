@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, Text, Dimensions, Platform } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { StyleSheet, View, Text, Dimensions, Platform, Animated } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { COLORS, SPACING, FONT_SIZES } from '../constants';
 
@@ -8,10 +8,21 @@ interface LoadingOverlayProps {
 }
 
 export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ visible }) => {
-    if (!visible) return null;
+    const opacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(opacity, {
+            toValue: visible ? 1 : 0,
+            duration: visible ? 200 : 150,
+            useNativeDriver: true,
+        }).start();
+    }, [visible, opacity]);
 
     return (
-        <View style={styles.container}>
+        <Animated.View
+            style={[styles.container, { opacity }]}
+            pointerEvents={visible ? 'auto' : 'none'}
+        >
             <LottieView
                 source={require('../assets/animations/car-loading.json')}
                 autoPlay
@@ -19,7 +30,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ visible }) => {
                 style={styles.animation}
             />
             <Text style={styles.text}>Sit tight, finding some recs</Text>
-        </View>
+        </Animated.View>
     );
 };
 
@@ -46,4 +57,4 @@ const styles = StyleSheet.create({
         color: COLORS.TEXT,
         fontWeight: '600',
     },
-}); 
+});

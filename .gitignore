@@ -78,3 +78,7 @@ ios/*.xcworkspace
 ios/*.xcodeproj/xcuserdata
 
 playstore.json
+
+# Build artifacts
+*.aab
+*.apk

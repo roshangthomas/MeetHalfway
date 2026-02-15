@@ -12,10 +12,9 @@ import {
     Dimensions,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
-import { Restaurant, TravelMode } from '../types';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, PARTICIPANT_COLORS } from '../constants';
+import { Restaurant, TravelMode, RootStackParamList } from '../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
 import { getPlaceDetails } from '../services/places';
 import {
     logger,
@@ -43,13 +42,14 @@ const getTravelModeIcon = (mode?: TravelMode): keyof typeof FontAwesome.glyphMap
 };
 
 export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ route, navigation }) => {
-    const { restaurant, userLocation, partnerLocation, travelMode = 'driving' } = route.params;
+    const { restaurant, participants, travelMode = 'driving' } = route.params;
     const [detailedRestaurant, setDetailedRestaurant] = useState<Restaurant>(restaurant);
     const [isLoading, setIsLoading] = useState(true);
     const [hoursExpanded, setHoursExpanded] = useState(false);
     const { savedIds, toggleSaved } = useSavedPlaces();
 
     const isSaved = savedIds.has(restaurant.id);
+    const userLocation = participants[0]?.location;
 
     useEffect(() => {
         const fetchPlaceDetails = async () => {
@@ -73,6 +73,7 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
     }, [restaurant.id]);
 
     const handleGetDirections = () => {
+        if (!userLocation) return;
         const url = getDirectionsUrl(
             userLocation,
             { latitude: restaurant.latitude, longitude: restaurant.longitude },
@@ -123,24 +124,19 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
     const specificType = getSpecificType(detailedRestaurant.types);
     const travelIcon = getTravelModeIcon(travelMode);
 
-    const userDuration = detailedRestaurant.durationA || detailedRestaurant.duration;
-    const userDistance = detailedRestaurant.distanceA || detailedRestaurant.distance;
-    const partnerDuration = detailedRestaurant.durationB;
-    const partnerDistance = detailedRestaurant.distanceB;
-
     const todayHours = getTodayHours(detailedRestaurant.businessHours);
 
     // --- Fairness badge ---
     const renderFairnessBadge = () => {
-        if (detailedRestaurant.timeDifference === undefined) return null;
+        if (detailedRestaurant.maxTimeDifference === undefined) return null;
 
         let badgeColor: string = COLORS.SUCCESS;
         let badgeText = 'Very Fair';
 
-        if (detailedRestaurant.timeDifference > 15) {
+        if (detailedRestaurant.maxTimeDifference > 15) {
             badgeColor = COLORS.ERROR;
             badgeText = 'Uneven';
-        } else if (detailedRestaurant.timeDifference > 5) {
+        } else if (detailedRestaurant.maxTimeDifference > 5) {
             badgeColor = COLORS.WARNING;
             badgeText = 'Somewhat Fair';
         }
@@ -215,10 +211,48 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         );
     };
 
+    // --- Travel comparison cards ---
+    const renderTravelComparison = () => {
+        const durations = detailedRestaurant.durations;
+        const distances = detailedRestaurant.distances;
+        if (!durations || durations.length === 0) return null;
+
+        return (
+            <>
+                <Text style={styles.sectionTitle}>Travel Comparison</Text>
+                <View style={styles.travelComparison}>
+                    {durations.map((duration, i) => (
+                        <View key={i} style={styles.travelCard}>
+                            <View style={styles.travelCardHeader}>
+                                <FontAwesome
+                                    name={travelIcon}
+                                    size={16}
+                                    color={PARTICIPANT_COLORS[i] || PARTICIPANT_COLORS[PARTICIPANT_COLORS.length - 1]}
+                                />
+                                <Text style={styles.travelCardLabel}>
+                                    {participants[i]?.name || (i === 0 ? 'You' : 'Them')}
+                                </Text>
+                            </View>
+                            <Text style={styles.travelCardDuration}>{duration}</Text>
+                            {distances?.[i] && (
+                                <Text style={styles.travelCardDistance}>{distances[i]}</Text>
+                            )}
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.fairnessBadgeRow}>
+                    {renderFairnessBadge()}
+                </View>
+
+                <View style={styles.divider} />
+            </>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-                {/* Hero Image Carousel */}
                 <View>
                     <ImageCarousel
                         photoUrls={detailedRestaurant.photoUrls}
@@ -230,9 +264,7 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                     />
                 </View>
 
-                {/* Content */}
                 <View style={styles.content}>
-                    {/* Name + Open/Closed badge */}
                     <View style={styles.nameRow}>
                         <Text style={styles.name} numberOfLines={2}>{detailedRestaurant.name}</Text>
                         {!isLoading && openStatus !== null && (
@@ -250,7 +282,6 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                         )}
                     </View>
 
-                    {/* Info line: ★ 4.5 (1092) · $$$$ · Steakhouse */}
                     <View style={styles.infoLine}>
                         <RatingDisplay rating={detailedRestaurant.rating} totalRatings={detailedRestaurant.totalRatings} size={15} />
                         {priceText ? (
@@ -261,7 +292,6 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                         ) : null}
                     </View>
 
-                    {/* Editorial summary from Google */}
                     {detailedRestaurant.editorialSummary && (
                         <Text style={styles.editorialSummary}>
                             {detailedRestaurant.editorialSummary}
@@ -270,48 +300,8 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
 
                     <View style={styles.divider} />
 
-                    {/* Travel Comparison Section */}
-                    {userDuration && (
-                        <>
-                            <Text style={styles.sectionTitle}>Travel Comparison</Text>
-                            <View style={styles.travelComparison}>
-                                {/* Your travel */}
-                                <View style={styles.travelCard}>
-                                    <View style={styles.travelCardHeader}>
-                                        <FontAwesome name={travelIcon} size={16} color={COLORS.PRIMARY} />
-                                        <Text style={styles.travelCardLabel}>You</Text>
-                                    </View>
-                                    <Text style={styles.travelCardDuration}>{userDuration}</Text>
-                                    {userDistance && (
-                                        <Text style={styles.travelCardDistance}>{userDistance}</Text>
-                                    )}
-                                </View>
+                    {renderTravelComparison()}
 
-                                {/* Partner travel */}
-                                {partnerDuration && (
-                                    <View style={styles.travelCard}>
-                                        <View style={styles.travelCardHeader}>
-                                            <FontAwesome name={travelIcon} size={16} color={COLORS.SECONDARY} />
-                                            <Text style={styles.travelCardLabel}>Partner</Text>
-                                        </View>
-                                        <Text style={styles.travelCardDuration}>{partnerDuration}</Text>
-                                        {partnerDistance && (
-                                            <Text style={styles.travelCardDistance}>{partnerDistance}</Text>
-                                        )}
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Fairness badge centered below */}
-                            <View style={styles.fairnessBadgeRow}>
-                                {renderFairnessBadge()}
-                            </View>
-
-                            <View style={styles.divider} />
-                        </>
-                    )}
-
-                    {/* Address row - tappable */}
                     {detailedRestaurant.address && (
                         <>
                             <TouchableOpacity
@@ -329,7 +319,6 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                         </>
                     )}
 
-                    {/* Business hours / Loading */}
                     {isLoading ? (
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="small" color={COLORS.PRIMARY} />
@@ -339,7 +328,6 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                         <>
                             {renderBusinessHours()}
 
-                            {/* Phone row - tappable */}
                             {detailedRestaurant.phoneNumber && (
                                 <>
                                     {detailedRestaurant.businessHours && detailedRestaurant.businessHours.length > 0 && (
@@ -363,7 +351,6 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                 </View>
             </ScrollView>
 
-            {/* Sticky Bottom Action Bar */}
             <View style={styles.bottomBar}>
                 <TouchableOpacity
                     style={styles.directionsButton}
@@ -494,10 +481,12 @@ const styles = StyleSheet.create({
     // --- Travel Comparison ---
     travelComparison: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: SPACING.MEDIUM,
     },
     travelCard: {
         flex: 1,
+        minWidth: '40%',
         backgroundColor: COLORS.BACKGROUND,
         borderRadius: BORDER_RADIUS.LARGE,
         padding: SPACING.MEDIUM,

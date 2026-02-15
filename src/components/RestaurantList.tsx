@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -8,11 +8,10 @@ import {
     Animated,
     Dimensions,
 } from 'react-native';
-import { Restaurant, Location, TravelMode } from '../types';
-import { COLORS } from '../constants';
+import { Restaurant, Participant, TravelMode, RootStackParamList } from '../types';
+import { COLORS, PARTICIPANT_COLORS, BORDER_RADIUS, SHADOWS } from '../constants';
 import { FontAwesome } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { RootStackParamList } from '../types';
 import { RatingDisplay } from './RatingDisplay';
 import { ImageCarousel } from './ImageCarousel';
 import { useSavedPlaces } from '../hooks/useSavedPlaces';
@@ -23,8 +22,7 @@ const CARD_HORIZONTAL_MARGIN = 16;
 
 interface RestaurantListProps {
     restaurants: Restaurant[];
-    userLocation: Location;
-    partnerLocation?: Location;
+    participants: Participant[];
     travelMode?: TravelMode;
 }
 
@@ -35,21 +33,36 @@ const getTravelModeIcon = (mode?: TravelMode): keyof typeof FontAwesome.glyphMap
 // --- Restaurant Card ---
 const RestaurantCard = React.memo<{
     restaurant: Restaurant;
-    userLocation: Location;
-    partnerLocation?: Location;
+    participants: Participant[];
     travelMode?: TravelMode;
     isSaved: boolean;
     onToggleSave: () => void;
 }>(({
     restaurant,
-    userLocation,
-    partnerLocation,
+    participants,
     travelMode,
     isSaved,
     onToggleSave,
 }) => {
     const navigation = useNavigation<NavigationProp<RootStackParamList>>();
     const scaleAnim = useRef(new Animated.Value(1)).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+            Animated.timing(slideAnim, {
+                toValue: 0,
+                duration: 300,
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [fadeAnim, slideAnim]);
 
     const handlePressIn = () => {
         Animated.spring(scaleAnim, {
@@ -72,23 +85,22 @@ const RestaurantCard = React.memo<{
     const handlePress = () => {
         navigation.navigate('RestaurantDetail', {
             restaurant,
-            userLocation,
-            partnerLocation: partnerLocation || userLocation,
+            participants,
             travelMode: travelMode || 'driving',
         });
     };
 
     // --- Fairness badge ---
     const renderFairnessBadge = () => {
-        if (restaurant.timeDifference === undefined) return null;
+        if (restaurant.maxTimeDifference === undefined) return null;
 
         let badgeColor: string = COLORS.SUCCESS;
         let badgeText = 'Very Fair';
 
-        if (restaurant.timeDifference > 15) {
+        if (restaurant.maxTimeDifference > 15) {
             badgeColor = COLORS.ERROR;
             badgeText = 'Uneven';
-        } else if (restaurant.timeDifference > 5) {
+        } else if (restaurant.maxTimeDifference > 5) {
             badgeColor = COLORS.WARNING;
             badgeText = 'Somewhat Fair';
         }
@@ -108,20 +120,20 @@ const RestaurantCard = React.memo<{
     // --- Open/Closed status ---
     const openStatus = isBusinessOpen(restaurant.businessHours);
 
-    // --- Condensed travel info ---
-    const userDuration = restaurant.durationA || restaurant.duration;
-    const partnerDuration = restaurant.durationB;
+    // --- Travel info ---
     const travelIcon = getTravelModeIcon(travelMode);
 
     return (
-        <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
+        <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ scale: scaleAnim }, { translateY: slideAnim }] }]}>
             <TouchableOpacity
                 activeOpacity={1}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
                 onPress={handlePress}
+                accessibilityLabel={`${restaurant.name}${restaurant.rating ? `, rated ${restaurant.rating}` : ''}`}
+                accessibilityRole="button"
+                accessibilityHint="Opens restaurant details"
             >
-                {/* Image carousel with heart + fairness badge */}
                 <View>
                     <ImageCarousel
                         photoUrls={restaurant.photoUrls}
@@ -132,12 +144,9 @@ const RestaurantCard = React.memo<{
                     {renderFairnessBadge()}
                 </View>
 
-                {/* Content area */}
                 <View style={styles.contentContainer}>
-                    {/* Name */}
                     <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
 
-                    {/* Info line: ★ 4.0 (146) · $$ · Italian · Orinda */}
                     <View style={styles.infoLine}>
                         <RatingDisplay rating={restaurant.rating} totalRatings={restaurant.totalRatings} size={13} />
                         {priceText ? (
@@ -151,33 +160,40 @@ const RestaurantCard = React.memo<{
                         ) : null}
                     </View>
 
-                    {/* Editorial summary / cuisine description */}
                     {restaurant.editorialSummary && (
                         <Text style={styles.editorialText} numberOfLines={1}>
                             {restaurant.editorialSummary}
                         </Text>
                     )}
 
-                    {/* Open/Closed status */}
                     {openStatus !== null && (
                         <Text style={openStatus ? styles.openText : styles.closedText}>
                             {openStatus ? 'Open now' : 'Closed'}
                         </Text>
                     )}
 
-                    {/* Travel info chips */}
-                    {userDuration && (
-                        <View style={styles.travelRow}>
-                            <View style={styles.travelChip}>
-                                <FontAwesome name={travelIcon} size={12} color={COLORS.PRIMARY} />
-                                <Text style={styles.travelChipText}>You: {userDuration}</Text>
-                            </View>
-                            {partnerLocation && partnerDuration && (
-                                <View style={styles.travelChip}>
-                                    <FontAwesome name={travelIcon} size={12} color={COLORS.SECONDARY} />
-                                    <Text style={styles.travelChipText}>Partner: {partnerDuration}</Text>
-                                </View>
-                            )}
+                    {restaurant.durations && restaurant.durations.length > 0 && (
+                        <View style={styles.travelRow} accessibilityRole="summary">
+                            {restaurant.durations.map((duration, i) => {
+                                const participantName = participants[i]?.name || `Person ${i + 1}`;
+                                const showName = participants.length > 2;
+                                return (
+                                    <View
+                                        key={i}
+                                        style={styles.travelChip}
+                                        accessibilityLabel={`${participantName}: ${duration} travel time`}
+                                    >
+                                        <FontAwesome
+                                            name={travelIcon}
+                                            size={12}
+                                            color={PARTICIPANT_COLORS[i] || PARTICIPANT_COLORS[PARTICIPANT_COLORS.length - 1]}
+                                        />
+                                        <Text style={styles.travelChipText}>
+                                            {showName ? `${participantName.split(' ')[0]}: ${duration}` : duration}
+                                        </Text>
+                                    </View>
+                                );
+                            })}
                         </View>
                     )}
                 </View>
@@ -191,8 +207,7 @@ RestaurantCard.displayName = 'RestaurantCard';
 // --- Main List ---
 export const RestaurantList: React.FC<RestaurantListProps> = ({
     restaurants,
-    userLocation,
-    partnerLocation,
+    participants,
     travelMode,
 }) => {
     const { savedIds, toggleSaved } = useSavedPlaces();
@@ -200,13 +215,12 @@ export const RestaurantList: React.FC<RestaurantListProps> = ({
     const renderItem = useCallback(({ item }: { item: Restaurant }) => (
         <RestaurantCard
             restaurant={item}
-            userLocation={userLocation}
-            partnerLocation={partnerLocation}
+            participants={participants}
             travelMode={travelMode}
             isSaved={savedIds.has(item.id)}
             onToggleSave={() => toggleSaved(item.id)}
         />
-    ), [userLocation, partnerLocation, travelMode, savedIds, toggleSaved]);
+    ), [participants, travelMode, savedIds, toggleSaved]);
 
     return (
         <FlatList
@@ -231,7 +245,13 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     card: {
-        marginBottom: 24,
+        marginBottom: 20,
+        borderRadius: BORDER_RADIUS.LARGE,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: COLORS.GRAY_LIGHT,
+        backgroundColor: COLORS.SURFACE,
+        overflow: 'hidden',
+        ...SHADOWS.SMALL,
     },
     fairnessBadge: {
         position: 'absolute',
@@ -249,7 +269,8 @@ const styles = StyleSheet.create({
     // --- Content ---
     contentContainer: {
         paddingTop: 10,
-        paddingBottom: 4,
+        paddingBottom: 12,
+        paddingHorizontal: 12,
     },
     name: {
         fontSize: 16,
@@ -291,6 +312,7 @@ const styles = StyleSheet.create({
     // --- Travel chips ---
     travelRow: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
         marginTop: 4,
     },

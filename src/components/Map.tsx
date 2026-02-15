@@ -1,18 +1,40 @@
-import React, { useState, forwardRef, ForwardRefRenderFunction } from 'react';
-import { StyleSheet, View, Dimensions } from 'react-native';
+import React, { useState, useCallback, forwardRef, ForwardRefRenderFunction } from 'react';
+import { StyleSheet, View, Dimensions, Platform } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { Location, Restaurant } from '../types';
-import { COLORS, MAP_DELTAS, SPACING, BORDER_RADIUS } from '../constants';
+import { Restaurant, Participant, Location } from '../types';
+import { COLORS, MAP_DELTAS, SPACING, BORDER_RADIUS, PARTICIPANT_COLORS } from '../constants';
 
 interface MapProps {
-    userLocation: Location;
-    partnerLocation?: Location | null;
+    participants: Participant[];
     midpoint?: Location | null;
     restaurants: Restaurant[];
 }
 
 const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) => {
     const [mapReady, setMapReady] = useState(false);
+
+    const firstLocation = props.participants[0]?.location;
+    if (!firstLocation) return null;
+
+    const handleMapReady = useCallback(() => {
+        setMapReady(true);
+
+        const mapRef = ref as React.MutableRefObject<MapView | null>;
+        if (!mapRef?.current) return;
+
+        const coordinates: Location[] = [];
+        for (const p of props.participants) {
+            if (p.location) coordinates.push(p.location);
+        }
+        if (props.midpoint) coordinates.push(props.midpoint);
+
+        if (coordinates.length >= 2) {
+            mapRef.current.fitToCoordinates(coordinates, {
+                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                animated: false,
+            });
+        }
+    }, [ref, props.participants, props.midpoint]);
 
     return (
         <View style={styles.container}>
@@ -21,29 +43,24 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                 provider={PROVIDER_GOOGLE}
                 style={styles.map}
                 initialRegion={{
-                    ...props.userLocation,
+                    ...firstLocation,
                     latitudeDelta: MAP_DELTAS.LATITUDE,
                     longitudeDelta: MAP_DELTAS.LONGITUDE,
                 }}
-                onMapReady={() => setMapReady(true)}
+                onMapReady={handleMapReady}
                 showsUserLocation={true}
                 showsMyLocationButton={true}
             >
                 {mapReady && (
                     <>
-                        <Marker
-                            coordinate={props.userLocation}
-                            title="Your Location"
-                            pinColor="blue"
-                        />
-
-                        {props.partnerLocation && (
+                        {props.participants.map((p, i) => p.location && (
                             <Marker
-                                coordinate={props.partnerLocation}
-                                title="Partner's Location"
-                                pinColor="green"
+                                key={`participant-${i}`}
+                                coordinate={p.location}
+                                title={p.name}
+                                pinColor={PARTICIPANT_COLORS[i] || PARTICIPANT_COLORS[PARTICIPANT_COLORS.length - 1]}
                             />
-                        )}
+                        ))}
 
                         {props.midpoint && (
                             <Marker
@@ -97,4 +114,4 @@ const styles = StyleSheet.create({
         bottom: 0,
         right: 0,
     },
-}); 
+});

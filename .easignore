@@ -1,0 +1,38 @@
+# Documentation
+docs/
+*.md
+!README.md
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+.cursorrules
+CLAUDE.md
+
+# Testing
+coverage/
+__tests__/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Temp
+.tmp/
+tmp/
+
+# Build artifacts
+build.aab
+build/
+
+# Git
+.git/
+.gitignore
+
