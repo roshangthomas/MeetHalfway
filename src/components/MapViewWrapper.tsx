@@ -2,11 +2,7 @@ import React, { forwardRef } from 'react';
 import MapView, { MapViewProps } from 'react-native-maps';
 import { View, Platform, StyleSheet } from 'react-native';
 
-// Create a forwarded ref component for MapView with removeClippedSubviews={false}
-// to prevent VirtualizedList nesting issues
 const MapViewWrapper = forwardRef<MapView, MapViewProps>((props, ref) => {
-    // The removeClippedSubviews={false} helps prevent the VirtualizedList nesting error
-    // We wrap it in a View to further isolate it from ScrollView's VirtualizedList
     return (
         <View style={styles.container}>
             <MapView
@@ -33,7 +29,6 @@ const MapViewWrapper = forwardRef<MapView, MapViewProps>((props, ref) => {
     );
 });
 
-// Add display name for debugging purposes
 MapViewWrapper.displayName = 'MapViewWrapper';
 
 const styles = StyleSheet.create({

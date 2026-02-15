@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../constants/colors';
-import { SPACING } from '../constants/index';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { COLORS, SPACING } from '../constants';
+import { logger } from '../utils/logger';
 
 interface Props {
     children: ReactNode;
@@ -23,16 +23,29 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error('Uncaught error:', error, errorInfo);
+        logger.error('Uncaught error:', error, errorInfo);
     }
+
+    public resetError = () => {
+        this.setState({ hasError: false, error: null });
+    };
 
     public render() {
         if (this.state.hasError) {
             return (
                 <View style={styles.container}>
+                    <Text style={styles.errorTitle}>Something went wrong</Text>
                     <Text style={styles.errorText}>
-                        Something went wrong. Please try again later.
+                        {this.state.error?.message || 'An unexpected error occurred'}
                     </Text>
+                    <TouchableOpacity
+                        style={styles.retryButton}
+                        onPress={this.resetError}
+                        accessibilityLabel="Try again"
+                        accessibilityRole="button"
+                    >
+                        <Text style={styles.retryButtonText}>Try Again</Text>
+                    </TouchableOpacity>
                 </View>
             );
         }
@@ -47,9 +60,29 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: SPACING.LARGE,
+        backgroundColor: COLORS.BACKGROUND,
+    },
+    errorTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: COLORS.TEXT,
+        marginBottom: 8,
     },
     errorText: {
-        color: COLORS.ERROR,
+        color: COLORS.TEXT_SECONDARY,
         textAlign: 'center',
+        marginBottom: 24,
+        fontSize: 16,
     },
-}); 
+    retryButton: {
+        backgroundColor: COLORS.PRIMARY,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    retryButtonText: {
+        color: COLORS.SURFACE,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+});

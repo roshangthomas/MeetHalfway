@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, ScrollView, SafeAreaView, Text, TouchableOpacity, ActivityIndicator, FlatList, Image } from 'react-native';
+import { View, SafeAreaView, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { RestaurantList } from '../components/RestaurantList';
-import { Restaurant, Location, TravelMode, SortOption, RootStackParamList } from '../types';
+import { SortOption, RootStackParamList } from '../types';
 import { styles } from '../styles/Results.styles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 import { Ionicons } from '@expo/vector-icons';
 import { FilterModal, FilterOptions } from '../components/FilterModal';
 import { FontAwesome } from '@expo/vector-icons';
 import { AntDesign } from '@expo/vector-icons';
 import { SortModal } from '../components/SortModal';
 import * as Font from 'expo-font';
+import { parseDurationToMinutes } from '../utils/duration';
 
 type ResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'Results'>;
 
@@ -19,33 +20,12 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
     const [sortOption, setSortOption] = useState<SortOption>('distance');
     const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
     const [isSortModalVisible, setIsSortModalVisible] = useState(false);
-    const [fontsLoaded, setFontsLoaded] = useState(false);
     const [filters, setFilters] = useState<FilterOptions>({
         minRating: 0,
         minReviews: 0,
         maxPrice: 4,
     });
 
-    // Helper function to convert duration strings like "15 mins" to minutes
-    const convertDurationToMinutes = (duration: string): number => {
-        if (!duration || duration === 'Unknown') return 0;
-
-        // Extract numbers from the duration text
-        const matches = duration.match(/(\d+)/g);
-        if (!matches) return 0;
-
-        if (duration.includes('hour') || duration.includes('hr')) {
-            // Handle hours and minutes format (e.g., "1 hour 20 mins")
-            const hours = parseInt(matches[0], 10) || 0;
-            const minutes = matches.length > 1 ? parseInt(matches[1], 10) : 0;
-            return (hours * 60) + minutes;
-        } else {
-            // Handle minutes only format (e.g., "20 mins")
-            return parseInt(matches[0], 10) || 0;
-        }
-    };
-
-    // Load fonts
     useEffect(() => {
         async function loadFonts() {
             await Font.loadAsync({
@@ -53,25 +33,20 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 ...Ionicons.font,
                 ...AntDesign.font
             });
-            setFontsLoaded(true);
         }
         loadFonts();
     }, []);
 
     const sortedAndFilteredRestaurants = useMemo(() => {
-        // First apply filters
         let filteredResults = restaurants.filter(restaurant => {
-            // Filter by minimum rating
             if (filters.minRating > 0 && (!restaurant.rating || restaurant.rating < filters.minRating)) {
                 return false;
             }
 
-            // Filter by minimum reviews
             if (filters.minReviews > 0 && (!restaurant.totalRatings || restaurant.totalRatings < filters.minReviews)) {
                 return false;
             }
 
-            // Filter by price level
             if (restaurant.priceLevel && restaurant.priceLevel > filters.maxPrice) {
                 return false;
             }
@@ -79,7 +54,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
             return true;
         });
 
-        // Then sort the filtered results
         return [...filteredResults].sort((a, b) => {
             switch (sortOption) {
                 case 'rating':
@@ -87,19 +61,17 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
                 case 'price':
                     return (a.priceLevel || 0) - (b.priceLevel || 0);
                 case 'travelTimeDiff':
-                    // Calculate travel time difference for sorting
-                    const aUserTime = a.durationA ? convertDurationToMinutes(a.durationA) : 0;
-                    const aFriendTime = a.durationB ? convertDurationToMinutes(a.durationB) : 0;
+                    const aUserTime = a.durationA ? parseDurationToMinutes(a.durationA) : 0;
+                    const aFriendTime = a.durationB ? parseDurationToMinutes(a.durationB) : 0;
                     const aDiff = Math.abs(aUserTime - aFriendTime);
 
-                    const bUserTime = b.durationA ? convertDurationToMinutes(b.durationA) : 0;
-                    const bFriendTime = b.durationB ? convertDurationToMinutes(b.durationB) : 0;
+                    const bUserTime = b.durationA ? parseDurationToMinutes(b.durationA) : 0;
+                    const bFriendTime = b.durationB ? parseDurationToMinutes(b.durationB) : 0;
                     const bDiff = Math.abs(bUserTime - bFriendTime);
 
                     return aDiff - bDiff;
                 case 'distance':
                 default:
-                    // Default sort by distance
                     const aDistance = a.distance ? parseFloat(a.distance.replace(/[^0-9.]/g, '')) : 0;
                     const bDistance = b.distance ? parseFloat(b.distance.replace(/[^0-9.]/g, '')) : 0;
                     return aDistance - bDistance;
@@ -117,7 +89,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         setIsSortModalVisible(false);
     };
 
-    // Get the active filter count
     const getActiveFilterCount = (): number => {
         let count = 0;
         if (filters.minRating > 0) count++;
@@ -126,7 +97,6 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         return count;
     };
 
-    // Get sort option display name
     const getSortOptionDisplayName = (): string => {
         switch (sortOption) {
             case 'distance':
@@ -142,38 +112,113 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
         }
     };
 
+    const activeFilterCount = getActiveFilterCount();
+    const hasActiveFilters = activeFilterCount > 0;
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
-                {/* Filter and Sort Bar */}
+                {/* Pill chip filter/sort bar */}
                 <View style={styles.filterSortBar}>
-                    <View style={styles.divider} />
-
-                    <View style={styles.filterSortButtonsContainer}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.pillScrollContent}
+                    >
+                        {/* Filters pill */}
                         <TouchableOpacity
-                            style={styles.filterSortButton}
+                            style={[
+                                styles.pillChip,
+                                hasActiveFilters && styles.pillChipActive,
+                            ]}
                             onPress={() => setIsFilterModalVisible(true)}
                         >
-                            <Text style={styles.filterSortButtonText}>
-                                Filters{getActiveFilterCount() > 0 ? ` (${getActiveFilterCount()})` : ''}
+                            <Ionicons
+                                name="options-outline"
+                                size={16}
+                                color={hasActiveFilters ? COLORS.SURFACE : COLORS.TEXT}
+                            />
+                            <Text style={[
+                                styles.pillChipText,
+                                hasActiveFilters && styles.pillChipTextActive,
+                            ]}>
+                                Filters{hasActiveFilters ? ` (${activeFilterCount})` : ''}
                             </Text>
-                            <FontAwesome name="filter" size={20} color="black" />
                         </TouchableOpacity>
 
-                        <View style={styles.verticalDivider} />
-
+                        {/* Sort pill */}
                         <TouchableOpacity
-                            style={styles.filterSortButton}
+                            style={[
+                                styles.pillChip,
+                                sortOption !== 'distance' && styles.pillChipActive,
+                            ]}
                             onPress={() => setIsSortModalVisible(true)}
                         >
-                            <Text style={styles.filterSortButtonText}>
-                                Sort: {getSortOptionDisplayName()}
+                            <FontAwesome
+                                name="sort-amount-asc"
+                                size={14}
+                                color={sortOption !== 'distance' ? COLORS.SURFACE : COLORS.TEXT}
+                            />
+                            <Text style={[
+                                styles.pillChipText,
+                                sortOption !== 'distance' && styles.pillChipTextActive,
+                            ]}>
+                                {getSortOptionDisplayName()}
                             </Text>
-                            <FontAwesome name="sort" size={20} color={COLORS.TEXT} />
+                            <FontAwesome
+                                name="chevron-down"
+                                size={10}
+                                color={sortOption !== 'distance' ? COLORS.SURFACE : COLORS.TEXT_SECONDARY}
+                            />
                         </TouchableOpacity>
-                    </View>
 
-                    <View style={styles.divider} />
+                        {/* Quick filter: Rating 4+ */}
+                        <TouchableOpacity
+                            style={[
+                                styles.pillChip,
+                                filters.minRating >= 4 && styles.pillChipActive,
+                            ]}
+                            onPress={() => {
+                                setFilters(prev => ({
+                                    ...prev,
+                                    minRating: prev.minRating >= 4 ? 0 : 4,
+                                }));
+                            }}
+                        >
+                            <FontAwesome
+                                name="star"
+                                size={12}
+                                color={filters.minRating >= 4 ? COLORS.SURFACE : COLORS.TEXT}
+                            />
+                            <Text style={[
+                                styles.pillChipText,
+                                filters.minRating >= 4 && styles.pillChipTextActive,
+                            ]}>
+                                4+
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Quick filter: $$ (price ≤ 2) */}
+                        <TouchableOpacity
+                            style={[
+                                styles.pillChip,
+                                filters.maxPrice <= 2 && styles.pillChipActive,
+                            ]}
+                            onPress={() => {
+                                setFilters(prev => ({
+                                    ...prev,
+                                    maxPrice: prev.maxPrice <= 2 ? 4 : 2,
+                                }));
+                            }}
+                        >
+                            <Text style={[
+                                styles.pillChipText,
+                                filters.maxPrice <= 2 && styles.pillChipTextActive,
+                            ]}>
+                                $$
+                            </Text>
+                        </TouchableOpacity>
+                    </ScrollView>
                 </View>
 
                 <View style={styles.listContainer}>
@@ -209,4 +254,4 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({ route, navigation 
             />
         </SafeAreaView>
     );
-}; 
+};

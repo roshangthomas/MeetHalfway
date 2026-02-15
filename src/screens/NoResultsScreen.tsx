@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 
 type NoResultsScreenProps = NativeStackScreenProps<RootStackParamList, 'NoResults'>;
 
@@ -34,28 +35,28 @@ export const NoResultsScreen = ({ navigation, route }: NoResultsScreenProps) => 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: COLORS.SURFACE,
     },
     content: {
         flex: 1,
-        padding: 20,
+        padding: SPACING.LARGE,
         justifyContent: 'center',
         alignItems: 'center',
     },
     title: {
-        fontSize: 24,
+        fontSize: FONT_SIZES.XXL,
         fontWeight: 'bold',
-        marginBottom: 20,
+        marginBottom: SPACING.LARGE,
         textAlign: 'center',
     },
     message: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         textAlign: 'center',
         marginBottom: 20,
-        color: '#555',
+        color: COLORS.TEXT_SECONDARY,
     },
     suggestion: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: 'bold',
         marginBottom: 10,
     },
@@ -64,19 +65,19 @@ const styles = StyleSheet.create({
         marginBottom: 30,
     },
     bulletPoint: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         marginBottom: 5,
-        color: '#555',
+        color: COLORS.TEXT_SECONDARY,
     },
     button: {
-        backgroundColor: '#4a90e2',
+        backgroundColor: COLORS.PRIMARY,
         paddingVertical: 12,
         paddingHorizontal: 30,
-        borderRadius: 8,
+        borderRadius: BORDER_RADIUS.MEDIUM,
     },
     buttonText: {
-        color: 'white',
-        fontSize: 16,
+        color: COLORS.SURFACE,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: 'bold',
     },
 }); 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View, Platform } from 'react-native';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 
 interface LoadingSpinnerProps {
     size?: 'small' | 'large';
@@ -11,7 +11,6 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     size = 'large',
     color = COLORS.PRIMARY
 }) => {
-    // Force Android to use small/large strings instead of numbers
     const androidSize = size === 'large' ? 'large' : 'small';
 
     return (

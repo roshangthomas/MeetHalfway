@@ -1,5 +1,5 @@
 import { StyleSheet, Dimensions, Platform } from 'react-native';
-import { COLORS } from '../constants/colors';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../constants';
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,62 +12,181 @@ export const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        padding: 12,
-        paddingTop: 12,
+        padding: SPACING.MEDIUM,
+        paddingTop: SPACING.LARGE,
     },
+
     mapContainer: {
+        height: height * 0.18,
         width: '100%',
-        height: height * 0.25,
-        borderRadius: 12,
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
         overflow: 'hidden',
-        marginBottom: 12,
     },
     map: {
         width: '100%',
         height: '100%',
     },
-    inputContainer: {
-        marginBottom: 12,
+    mapLoadingContainer: {
+        height: height * 0.18,
         width: '100%',
-        zIndex: 998,
-        elevation: Platform.OS === 'android' ? 998 : 0,
+        backgroundColor: COLORS.GRAY_LIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderBottomLeftRadius: 24,
+        borderBottomRightRadius: 24,
+    },
+
+    routeCard: {
         backgroundColor: COLORS.SURFACE,
         borderRadius: 20,
-        padding: 16,
+        paddingVertical: 12,
+        paddingHorizontal: SPACING.MEDIUM,
         shadowColor: COLORS.TEXT,
         shadowOffset: {
             width: 0,
             height: 4,
         },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
+        shadowOpacity: 0.08,
+        shadowRadius: 16,
+        elevation: 4,
+        zIndex: 998,
     },
-    travelModeContainer: {
+    routeCardLoading: {
+        opacity: 0.6,
+    },
+    routeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        minHeight: 50,
+    },
+    routeDotContainer: {
+        width: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    routeDot: {
+        width: 14,
+        height: 14,
+        borderRadius: 7,
+        borderWidth: 3,
+        borderColor: COLORS.SURFACE,
+        shadowColor: COLORS.TEXT,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    routeDotOrigin: {
+        backgroundColor: COLORS.PRIMARY,
+    },
+    routeDotDestination: {
+        backgroundColor: COLORS.SECONDARY,
+    },
+    routeConnector: {
+        marginLeft: SPACING.MEDIUM,
+        paddingVertical: SPACING.XS,
+        alignItems: 'center',
+        width: 0,
+        gap: 5,
+    },
+    routeDotSmall: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: COLORS.GRAY_LIGHT,
+    },
+    routeLocationRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        backgroundColor: COLORS.BACKGROUND,
+        borderRadius: BORDER_RADIUS.LARGE,
+        marginLeft: SPACING.SMALL,
+    },
+    routeLocationText: {
+        flex: 1,
+        fontSize: 15,
+        color: COLORS.TEXT,
+        fontWeight: '500',
+    },
+    routeChangeText: {
+        fontSize: FONT_SIZES.MEDIUM,
+        color: COLORS.PRIMARY,
+        fontWeight: '600',
+        marginLeft: SPACING.SMALL,
+    },
+    routeInputArea: {
+        flex: 1,
+        marginLeft: SPACING.SMALL,
+    },
+    routeLoadingText: {
+        fontSize: FONT_SIZES.MEDIUM,
+        color: COLORS.GRAY,
+        marginLeft: SPACING.SMALL,
+    },
+    routeInputPlaceholder: {
+        flex: 1,
+        height: 50,
+        borderRadius: BORDER_RADIUS.LARGE,
+        marginLeft: SPACING.SMALL,
+    },
+
+    preferencesSection: {
+        marginTop: SPACING.LARGE,
+    },
+
+    findButtonContainer: {
+        marginTop: SPACING.SMALL,
+    },
+    findButton: {
+        backgroundColor: COLORS.PRIMARY,
+        padding: SPACING.MEDIUM,
+        borderRadius: 14,
+        alignItems: 'center',
+    },
+    findButtonText: {
+        color: COLORS.SURFACE,
+        fontSize: 17,
+        fontWeight: '700',
+    },
+
+    inputContainer: {
+        marginBottom: 12,
+        width: '100%',
+        zIndex: 998,
+        backgroundColor: COLORS.SURFACE,
+        borderRadius: 20,
+        padding: SPACING.MEDIUM,
+        ...SHADOWS.MEDIUM,
+        elevation: Platform.OS === 'android' ? 998 : 0,
+    },
+    error: {
+        color: COLORS.ERROR,
+        textAlign: 'center',
         marginTop: 12,
+        marginBottom: 12,
+    },
+    buttonDisabled: {
+        opacity: 0.7,
     },
     button: {
         backgroundColor: COLORS.PRIMARY,
         padding: 14,
-        borderRadius: 12,
+        borderRadius: BORDER_RADIUS.LARGE,
         alignItems: 'center',
         marginTop: 10,
         marginBottom: 12,
     },
     buttonText: {
         color: COLORS.SURFACE,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
     },
-    error: {
-        color: COLORS.ERROR,
-        textAlign: 'center',
-        marginBottom: 12,
-    },
-    buttonDisabled: {
-        opacity: 0.7,
-    },
     label: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
         marginBottom: 6,
         color: COLORS.TEXT,
@@ -80,68 +199,13 @@ export const styles = StyleSheet.create({
     },
     secondaryButtonText: {
         color: COLORS.PRIMARY,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
     },
     warningButton: {
         backgroundColor: COLORS.WARNING,
         marginTop: 6,
         marginBottom: 6,
-    },
-    userLocationContainer: {
-        marginBottom: 14,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.GRAY_LIGHT,
-    },
-    locationText: {
-        fontSize: 16,
-        color: COLORS.TEXT,
-        marginBottom: 4,
-        fontWeight: '500',
-        flex: 1,
-        marginRight: 8,
-    },
-    locationInfoContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-    },
-    changeLocationButton: {
-        padding: 6,
-        marginTop: 0,
-        marginBottom: 0,
-        minWidth: 80,
-    },
-    findButtonContainer: {
-        marginTop: 8,
-    },
-    findButton: {
-        backgroundColor: COLORS.PRIMARY,
-        padding: 14,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 4,
-    },
-    findButtonText: {
-        color: COLORS.SURFACE,
-        fontSize: 16,
-        fontWeight: '700',
-    },
-    scrollIndicator: {
-        alignItems: 'center',
-        marginTop: 8,
-        marginBottom: 4,
-        flexDirection: 'row',
-        justifyContent: 'center',
-    },
-    scrollIndicatorText: {
-        fontSize: 14,
-        color: COLORS.PRIMARY,
-        marginLeft: 4,
-        fontStyle: 'italic',
     },
     buttonGroup: {
         flexDirection: 'row',
@@ -156,7 +220,7 @@ export const styles = StyleSheet.create({
     },
     cancelButtonText: {
         color: COLORS.SURFACE,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
     },
     headerBackButton: {
@@ -166,7 +230,7 @@ export const styles = StyleSheet.create({
     },
     headerBackText: {
         color: COLORS.PRIMARY,
-        fontSize: 16,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '500',
         marginLeft: 2,
     },
@@ -177,18 +241,18 @@ export const styles = StyleSheet.create({
         flexGrow: 1,
     },
     permissionMessageContainer: {
-        marginBottom: 16,
-        padding: 8,
+        marginBottom: SPACING.MEDIUM,
+        padding: SPACING.SMALL,
     },
     permissionTitle: {
-        fontSize: 18,
+        fontSize: FONT_SIZES.XL,
         fontWeight: '700',
         color: COLORS.TEXT,
-        marginBottom: 8,
+        marginBottom: SPACING.SMALL,
         textAlign: 'center',
     },
     permissionText: {
-        fontSize: 14,
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.TEXT,
         marginBottom: 12,
         textAlign: 'center',
@@ -197,17 +261,17 @@ export const styles = StyleSheet.create({
     warningBanner: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: '#FFF9C4',
+        backgroundColor: COLORS.WARNING_BANNER_BG,
         padding: 10,
-        borderRadius: 8,
+        borderRadius: BORDER_RADIUS.MEDIUM,
         marginBottom: 15,
         borderWidth: 1,
-        borderColor: '#FFD600',
+        borderColor: COLORS.WARNING_BANNER_BORDER,
     },
     warningText: {
         flex: 1,
-        marginLeft: 8,
+        marginLeft: SPACING.SMALL,
         fontSize: 13,
-        color: '#5D4037',
+        color: COLORS.WARNING_BANNER_TEXT,
     },
-}); 
+});

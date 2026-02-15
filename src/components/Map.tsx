@@ -2,7 +2,7 @@ import React, { useState, forwardRef, ForwardRefRenderFunction } from 'react';
 import { StyleSheet, View, Dimensions } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Location, Restaurant } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS, MAP_DELTAS, SPACING, BORDER_RADIUS } from '../constants';
 
 interface MapProps {
     userLocation: Location;
@@ -22,8 +22,8 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                 style={styles.map}
                 initialRegion={{
                     ...props.userLocation,
-                    latitudeDelta: 0.0922,
-                    longitudeDelta: 0.0421,
+                    latitudeDelta: MAP_DELTAS.LATITUDE,
+                    longitudeDelta: MAP_DELTAS.LONGITUDE,
                 }}
                 onMapReady={() => setMapReady(true)}
                 showsUserLocation={true}
@@ -31,14 +31,12 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
             >
                 {mapReady && (
                     <>
-                        {/* User Location */}
                         <Marker
                             coordinate={props.userLocation}
                             title="Your Location"
                             pinColor="blue"
                         />
 
-                        {/* Partner Location */}
                         {props.partnerLocation && (
                             <Marker
                                 coordinate={props.partnerLocation}
@@ -47,7 +45,6 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                             />
                         )}
 
-                        {/* Midpoint */}
                         {props.midpoint && (
                             <Marker
                                 coordinate={props.midpoint}
@@ -56,7 +53,6 @@ const MapComponent: ForwardRefRenderFunction<MapView, MapProps> = (props, ref) =
                             />
                         )}
 
-                        {/* Restaurants */}
                         {props.restaurants.map((restaurant) => (
                             <Marker
                                 key={restaurant.id}
@@ -82,8 +78,8 @@ const styles = StyleSheet.create({
         height: Dimensions.get('window').height * 0.45,
         width: '100%',
         marginTop: 0,
-        marginBottom: 16,
-        borderRadius: 16,
+        marginBottom: SPACING.MEDIUM,
+        borderRadius: BORDER_RADIUS.XL,
         overflow: 'hidden',
         shadowColor: COLORS.TEXT,
         shadowOffset: {

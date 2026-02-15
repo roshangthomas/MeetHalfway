@@ -20,15 +20,15 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Location as LocationType } from '../types';
-import { geocodeAddress } from '../services/location';
-import { ERROR_MESSAGES } from '../constants';
-import { COLORS } from '../constants/colors';
+import { ERROR_MESSAGES, COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
 import { Ionicons } from '@expo/vector-icons';
+import { logger, resolveLocation } from '../utils';
 
 type LocationPermissionScreenProps = NativeStackScreenProps<RootStackParamList, 'LocationPermission'>;
 
 export function LocationPermissionScreen({ navigation }: LocationPermissionScreenProps) {
   const [userAddress, setUserAddress] = useState('');
+  const [userPlaceId, setUserPlaceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpened, setSettingsOpened] = useState(false);
@@ -36,15 +36,12 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
   const scrollViewRef = useRef<ScrollView>(null);
   const inputContainerRef = useRef<View>(null);
 
-  // Check if app was reopened after settings
   useEffect(() => {
     if (settingsOpened) {
-      // When the app comes back to foreground after settings were opened
       const checkAppReturn = () => {
-        setCurrentStep(2); // Move to step 2 automatically
+        setCurrentStep(2);
       };
 
-      // Add event listener for when app comes back to foreground
       const subscription = AppState.addEventListener('change', (nextAppState: string) => {
         if (nextAppState === 'active' && settingsOpened) {
           checkAppReturn();
@@ -57,45 +54,29 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
     }
   }, [settingsOpened]);
 
-  // Function to handle input focus and scroll to ensure dropdown is visible
   const handleInputFocus = () => {
-    // Use a small delay to ensure component measurements are accurate
     setTimeout(() => {
-      // Find the input container and scroll to it with just enough offset
       if (inputContainerRef.current) {
         inputContainerRef.current.measureInWindow((x, y, width, height) => {
-          // Calculate how much to scroll to position the input field in the upper portion of the screen
-          // This ensures both the input and some space for dropdown are visible
           const screenHeight = Dimensions.get('window').height;
-          const keyboardHeight = screenHeight * 0.4; // Estimate keyboard height as 40% of screen
-          const desiredPosition = screenHeight * 0.2; // Position at 20% from top of screen
-
-          // Calculate scroll amount to position the input properly
+          const desiredPosition = screenHeight * 0.2;
           const scrollAmount = Math.max(0, y - desiredPosition);
-
-          // Scroll with animation
           scrollViewRef.current?.scrollTo({ y: scrollAmount, animated: true });
         });
       }
     }, 100);
   };
 
-  // Function to open device settings
   const openLocationSettings = () => {
-    // For iOS this opens the Settings app
-    // For Android this opens Location Settings
     if (Platform.OS === 'ios') {
       Linking.openURL('app-settings:');
     } else {
       Linking.openSettings();
     }
-    // Set flag that settings have been opened
     setSettingsOpened(true);
   };
 
-  // Function to refresh the app
   const refreshApp = () => {
-    // Navigate back to Home screen to trigger a reload
     navigation.reset({
       index: 0,
       routes: [{ name: 'Home' }],
@@ -112,9 +93,8 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
     setError(null);
 
     try {
-      const geocodedLocation = await geocodeAddress(userAddress);
+      const geocodedLocation = await resolveLocation(userAddress, userPlaceId);
 
-      // Use navigation.reset to ensure a clean navigation state
       navigation.reset({
         index: 0,
         routes: [
@@ -129,14 +109,13 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
       });
 
     } catch (error) {
-      console.error('Failed to geocode user address:', error);
+      logger.error('Failed to geocode user address:', error);
       setError(error instanceof Error ? error.message : ERROR_MESSAGES.GEOCODING_FAILED);
     } finally {
       setLoading(false);
     }
   };
 
-  // Render different content based on current step
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -223,27 +202,23 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
           >
             <View style={[styles.content, localStyles.compactContent]}>
               <View style={localStyles.headerContainer}>
-                <Ionicons name="location" size={32} color={COLORS.PRIMARY} />
-                <Text style={localStyles.headerTitle}>Location Access</Text>
-              </View>
+              <Ionicons name="location" size={32} color={COLORS.PRIMARY} />
+              <Text style={localStyles.headerTitle}>Location Access</Text>
+            </View>
 
-              {/* Brief explanation */}
-              <Text style={localStyles.explanationText}>
-                We need your location to find places that are halfway between you and your friend's location.
-              </Text>
+            <Text style={localStyles.explanationText}>
+              We need your location to find places that are halfway between you and your friend's location.
+            </Text>
 
-              {/* Step-based content */}
-              {renderStepContent()}
+            {renderStepContent()}
 
-              {/* Divider */}
-              <View style={localStyles.divider}>
+            <View style={localStyles.divider}>
                 <View style={localStyles.dividerLine} />
                 <Text style={localStyles.dividerText}>OR</Text>
-                <View style={localStyles.dividerLine} />
-              </View>
+              <View style={localStyles.dividerLine} />
+            </View>
 
-              {/* Manual location entry section */}
-              <View
+            <View
                 ref={inputContainerRef}
                 style={[styles.inputContainer, localStyles.manualContainer]}
               >
@@ -251,7 +226,14 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
 
                 <LocationInput
                   value={userAddress}
-                  onChangeText={setUserAddress}
+                  onChangeText={(text) => {
+                    setUserAddress(text);
+                    setUserPlaceId(null);
+                  }}
+                  onPlaceSelected={(placeId, description) => {
+                    setUserPlaceId(placeId);
+                    setUserAddress(description);
+                  }}
                   placeholder="Enter your location..."
                   onInputFocus={handleInputFocus}
                 />
@@ -267,18 +249,16 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
                   <Text style={localStyles.actionButtonText}>
                     Submit Location
                   </Text>
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
+            </View>
 
-              {/* Show error message if any */}
-              {error && (
+            {error && (
                 <Text style={styles.error}>
                   {error}
                 </Text>
-              )}
+            )}
 
-              {/* Moderate extra space at bottom for dropdown */}
-              <View style={localStyles.extraBottomSpace} />
+            <View style={localStyles.extraBottomSpace} />
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -290,27 +270,27 @@ export function LocationPermissionScreen({ navigation }: LocationPermissionScree
 // Local styles for this screen
 const localStyles = StyleSheet.create({
   compactContent: {
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: SPACING.SMALL,
+    paddingHorizontal: SPACING.SMALL,
   },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    paddingTop: 8,
+    marginBottom: SPACING.MEDIUM,
+    paddingTop: SPACING.SMALL,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: COLORS.TEXT,
-    marginLeft: 8,
+    marginLeft: SPACING.SMALL,
   },
   stepContainer: {
     backgroundColor: COLORS.SURFACE,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.LARGE,
+    padding: SPACING.MEDIUM,
+    marginBottom: SPACING.MEDIUM,
     shadowColor: COLORS.TEXT,
     shadowOffset: {
       width: 0,
@@ -332,15 +312,15 @@ const localStyles = StyleSheet.create({
     backgroundColor: COLORS.PRIMARY,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: SPACING.SMALL,
   },
   stepNumber: {
     color: COLORS.SURFACE,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: FONT_SIZES.MEDIUM,
   },
   stepTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.LARGE,
     fontWeight: '600',
     color: COLORS.TEXT,
   },
@@ -350,7 +330,7 @@ const localStyles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginTop: 12,
-    marginBottom: 8,
+    marginBottom: SPACING.SMALL,
     flexDirection: 'row',
     justifyContent: 'center',
   },
@@ -399,28 +379,28 @@ const localStyles = StyleSheet.create({
     paddingBottom: 12,
   },
   manualTitle: {
-    fontSize: 16,
+    fontSize: FONT_SIZES.LARGE,
     fontWeight: '600',
     color: COLORS.TEXT,
-    marginBottom: 8,
+    marginBottom: SPACING.SMALL,
     textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.MEDIUM,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     lineHeight: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.MEDIUM,
   },
   explanationText: {
-    fontSize: 14,
+    fontSize: FONT_SIZES.MEDIUM,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
+    marginBottom: SPACING.MEDIUM,
+    paddingHorizontal: SPACING.LARGE,
     lineHeight: 20,
   },
   extraBottomSpace: {
-    height: 120, // Moderate space to ensure dropdown is visible
+    height: 120,
   },
 });

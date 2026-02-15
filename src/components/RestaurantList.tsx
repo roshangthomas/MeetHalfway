@@ -1,20 +1,25 @@
-import React from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
     View,
     Text,
-    Image,
     StyleSheet,
     FlatList,
-    Dimensions,
-    Platform,
     TouchableOpacity,
+    Animated,
+    Dimensions,
 } from 'react-native';
 import { Restaurant, Location, TravelMode } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS } from '../constants';
 import { FontAwesome } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types';
 import { RatingDisplay } from './RatingDisplay';
+import { ImageCarousel } from './ImageCarousel';
+import { useSavedPlaces } from '../hooks/useSavedPlaces';
+import { renderPriceLevelText, isBusinessOpen, getShortLocation, getSpecificType, TRAVEL_MODE_ICONS } from '../utils';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_HORIZONTAL_MARGIN = 16;
 
 interface RestaurantListProps {
     restaurants: Restaurant[];
@@ -23,275 +28,284 @@ interface RestaurantListProps {
     travelMode?: TravelMode;
 }
 
-const RestaurantCard: React.FC<{
-    restaurant: Restaurant,
-    userLocation: Location,
-    partnerLocation?: Location,
-    travelMode?: TravelMode
-}> = ({
+const getTravelModeIcon = (mode?: TravelMode): keyof typeof FontAwesome.glyphMap => {
+    return TRAVEL_MODE_ICONS[mode || 'driving'] as keyof typeof FontAwesome.glyphMap;
+};
+
+// --- Restaurant Card ---
+const RestaurantCard = React.memo<{
+    restaurant: Restaurant;
+    userLocation: Location;
+    partnerLocation?: Location;
+    travelMode?: TravelMode;
+    isSaved: boolean;
+    onToggleSave: () => void;
+}>(({
     restaurant,
     userLocation,
     partnerLocation,
-    travelMode
+    travelMode,
+    isSaved,
+    onToggleSave,
 }) => {
-        const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+    const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+    const scaleAnim = useRef(new Animated.Value(1)).current;
 
-        const renderPriceLevel = (priceLevel?: number) => {
-            if (!priceLevel) return null;
-            return (
-                <Text style={styles.priceLevel}>
-                    {'$'.repeat(priceLevel)}
-                    <Text style={styles.priceLevelGray}>
-                        {'$'.repeat(4 - priceLevel)}
-                    </Text>
-                </Text>
-            );
-        };
+    const handlePressIn = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 0.98,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 4,
+        }).start();
+    };
 
-        const handlePress = () => {
-            navigation.navigate('RestaurantDetail', {
-                restaurant,
-                userLocation,
-                partnerLocation: partnerLocation || userLocation,
-                travelMode: travelMode || 'driving'
-            });
-        };
+    const handlePressOut = () => {
+        Animated.spring(scaleAnim, {
+            toValue: 1,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 4,
+        }).start();
+    };
 
-        // Render fairness badge if time difference is available
-        const renderFairnessBadge = () => {
-            if (restaurant.timeDifference === undefined) return null;
+    const handlePress = () => {
+        navigation.navigate('RestaurantDetail', {
+            restaurant,
+            userLocation,
+            partnerLocation: partnerLocation || userLocation,
+            travelMode: travelMode || 'driving',
+        });
+    };
 
-            let badgeColor = COLORS.SUCCESS;
-            let badgeText = 'Very Fair';
+    // --- Fairness badge ---
+    const renderFairnessBadge = () => {
+        if (restaurant.timeDifference === undefined) return null;
 
-            if (restaurant.timeDifference > 15) {
-                badgeColor = COLORS.ERROR;
-                badgeText = 'Uneven';
-            } else if (restaurant.timeDifference > 5) {
-                badgeColor = COLORS.WARNING;
-                badgeText = 'Somewhat Fair';
-            }
+        let badgeColor: string = COLORS.SUCCESS;
+        let badgeText = 'Very Fair';
 
-            return (
-                <View style={[styles.fairnessBadge, { backgroundColor: badgeColor }]}>
-                    <Text style={styles.fairnessBadgeText}>{badgeText}</Text>
-                </View>
-            );
-        };
+        if (restaurant.timeDifference > 15) {
+            badgeColor = COLORS.ERROR;
+            badgeText = 'Uneven';
+        } else if (restaurant.timeDifference > 5) {
+            badgeColor = COLORS.WARNING;
+            badgeText = 'Somewhat Fair';
+        }
 
         return (
-            <TouchableOpacity
-                style={styles.card}
-                onPress={handlePress}
-                activeOpacity={0.7}
-            >
-                <Image
-                    source={
-                        restaurant.photoUrl
-                            ? { uri: restaurant.photoUrl }
-                            : require('../../assets/placeholder-restaurant.png')
-                    }
-                    style={styles.image}
-                    resizeMode="cover"
-                />
-                {renderFairnessBadge()}
-                <View style={styles.contentContainer}>
-                    <Text style={styles.name}>{restaurant.name}</Text>
-                    {restaurant.types && (
-                        <Text style={styles.types}>
-                            {restaurant.types.slice(0, 2).join(' • ')}
-                        </Text>
-                    )}
-                    <View style={styles.ratingRow}>
-                        <RatingDisplay rating={restaurant.rating} totalRatings={restaurant.totalRatings} />
-                        {renderPriceLevel(restaurant.priceLevel)}
-                    </View>
-                    {restaurant.address && (
-                        <Text style={styles.address} numberOfLines={1}>
-                            {restaurant.address}
-                        </Text>
-                    )}
-
-                    {/* Travel info section */}
-                    <View style={styles.travelInfoContainer}>
-                        {/* Your travel info */}
-                        <View style={styles.travelInfoColumn}>
-                            <Text style={styles.travelInfoLabel}>Your Travel:</Text>
-                            {restaurant.durationA ? (
-                                <Text style={styles.travelDetail}>
-                                    <FontAwesome name="clock-o" size={14} color={COLORS.PRIMARY} />
-                                    {' ' + restaurant.durationA}
-                                </Text>
-                            ) : restaurant.duration ? (
-                                <Text style={styles.travelDetail}>
-                                    <FontAwesome name="clock-o" size={14} color={COLORS.PRIMARY} />
-                                    {' ' + restaurant.duration}
-                                </Text>
-                            ) : null}
-
-                            {restaurant.distanceA ? (
-                                <Text style={styles.travelDetail}>
-                                    <FontAwesome name="map-marker" size={14} color={COLORS.PRIMARY} />
-                                    {' ' + restaurant.distanceA}
-                                </Text>
-                            ) : restaurant.distance ? (
-                                <Text style={styles.travelDetail}>
-                                    <FontAwesome name="map-marker" size={14} color={COLORS.PRIMARY} />
-                                    {' ' + restaurant.distance}
-                                </Text>
-                            ) : null}
-                        </View>
-
-                        {/* Partner travel info - only show if we have partner location */}
-                        {partnerLocation && (
-                            <View style={styles.travelInfoColumn}>
-                                <Text style={styles.travelInfoLabel}>Partner Travel:</Text>
-                                {restaurant.durationB && (
-                                    <Text style={styles.travelDetail}>
-                                        <FontAwesome name="clock-o" size={14} color={COLORS.SECONDARY} />
-                                        {' ' + restaurant.durationB}
-                                    </Text>
-                                )}
-                                {restaurant.distanceB && (
-                                    <Text style={styles.travelDetail}>
-                                        <FontAwesome name="map-marker" size={14} color={COLORS.SECONDARY} />
-                                        {' ' + restaurant.distanceB}
-                                    </Text>
-                                )}
-                            </View>
-                        )}
-                    </View>
-                </View>
-            </TouchableOpacity>
+            <View style={[styles.fairnessBadge, { backgroundColor: badgeColor }]}>
+                <Text style={styles.fairnessBadgeText}>{badgeText}</Text>
+            </View>
         );
     };
 
+    // --- Build the info line: ★ 4.0 (146) · $$ · Orinda ---
+    const priceText = renderPriceLevelText(restaurant.priceLevel);
+    const shortLocation = getShortLocation(restaurant.address);
+    const specificType = getSpecificType(restaurant.types);
+
+    // --- Open/Closed status ---
+    const openStatus = isBusinessOpen(restaurant.businessHours);
+
+    // --- Condensed travel info ---
+    const userDuration = restaurant.durationA || restaurant.duration;
+    const partnerDuration = restaurant.durationB;
+    const travelIcon = getTravelModeIcon(travelMode);
+
+    return (
+        <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
+            <TouchableOpacity
+                activeOpacity={1}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+                onPress={handlePress}
+            >
+                {/* Image carousel with heart + fairness badge */}
+                <View>
+                    <ImageCarousel
+                        photoUrls={restaurant.photoUrls}
+                        photoUrl={restaurant.photoUrl}
+                        isSaved={isSaved}
+                        onToggleSave={onToggleSave}
+                    />
+                    {renderFairnessBadge()}
+                </View>
+
+                {/* Content area */}
+                <View style={styles.contentContainer}>
+                    {/* Name */}
+                    <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
+
+                    {/* Info line: ★ 4.0 (146) · $$ · Italian · Orinda */}
+                    <View style={styles.infoLine}>
+                        <RatingDisplay rating={restaurant.rating} totalRatings={restaurant.totalRatings} size={13} />
+                        {priceText ? (
+                            <Text style={styles.infoSeparator}> · <Text style={styles.infoText}>{priceText}</Text></Text>
+                        ) : null}
+                        {specificType ? (
+                            <Text style={styles.infoSeparator}> · <Text style={styles.infoText}>{specificType}</Text></Text>
+                        ) : null}
+                        {shortLocation ? (
+                            <Text style={styles.infoSeparator}> · <Text style={styles.infoText}>{shortLocation}</Text></Text>
+                        ) : null}
+                    </View>
+
+                    {/* Editorial summary / cuisine description */}
+                    {restaurant.editorialSummary && (
+                        <Text style={styles.editorialText} numberOfLines={1}>
+                            {restaurant.editorialSummary}
+                        </Text>
+                    )}
+
+                    {/* Open/Closed status */}
+                    {openStatus !== null && (
+                        <Text style={openStatus ? styles.openText : styles.closedText}>
+                            {openStatus ? 'Open now' : 'Closed'}
+                        </Text>
+                    )}
+
+                    {/* Travel info chips */}
+                    {userDuration && (
+                        <View style={styles.travelRow}>
+                            <View style={styles.travelChip}>
+                                <FontAwesome name={travelIcon} size={12} color={COLORS.PRIMARY} />
+                                <Text style={styles.travelChipText}>You: {userDuration}</Text>
+                            </View>
+                            {partnerLocation && partnerDuration && (
+                                <View style={styles.travelChip}>
+                                    <FontAwesome name={travelIcon} size={12} color={COLORS.SECONDARY} />
+                                    <Text style={styles.travelChipText}>Partner: {partnerDuration}</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+                </View>
+            </TouchableOpacity>
+        </Animated.View>
+    );
+});
+
+RestaurantCard.displayName = 'RestaurantCard';
+
+// --- Main List ---
 export const RestaurantList: React.FC<RestaurantListProps> = ({
     restaurants,
     userLocation,
     partnerLocation,
-    travelMode
+    travelMode,
 }) => {
+    const { savedIds, toggleSaved } = useSavedPlaces();
+
+    const renderItem = useCallback(({ item }: { item: Restaurant }) => (
+        <RestaurantCard
+            restaurant={item}
+            userLocation={userLocation}
+            partnerLocation={partnerLocation}
+            travelMode={travelMode}
+            isSaved={savedIds.has(item.id)}
+            onToggleSave={() => toggleSaved(item.id)}
+        />
+    ), [userLocation, partnerLocation, travelMode, savedIds, toggleSaved]);
+
     return (
         <FlatList
             data={restaurants}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-                <RestaurantCard
-                    restaurant={item}
-                    userLocation={userLocation}
-                    partnerLocation={partnerLocation}
-                    travelMode={travelMode}
-                />
-            )}
+            renderItem={renderItem}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
+            windowSize={5}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            removeClippedSubviews={true}
         />
     );
 };
 
+// --- Styles ---
 const styles = StyleSheet.create({
     list: {
-        padding: 8,
+        paddingHorizontal: CARD_HORIZONTAL_MARGIN,
+        paddingTop: 8,
+        paddingBottom: 20,
     },
     card: {
-        backgroundColor: COLORS.SURFACE,
-        borderRadius: 16,
-        marginVertical: 8,
-        marginHorizontal: 4,
-        overflow: 'hidden',
-        shadowColor: COLORS.TEXT,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    image: {
-        width: '100%',
-        height: 200,
-        backgroundColor: COLORS.GRAY_LIGHT,
-    },
-    contentContainer: {
-        padding: 16,
-    },
-    name: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: COLORS.TEXT,
-        marginBottom: 4,
-    },
-    types: {
-        fontSize: 14,
-        color: COLORS.TEXT_SECONDARY,
-        marginBottom: 8,
-    },
-    ratingRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
-    ratingContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    star: {
-        marginRight: 2,
-    },
-    ratingCount: {
-        fontSize: 14,
-        color: COLORS.TEXT_SECONDARY,
-        marginLeft: 4,
-    },
-    priceLevel: {
-        fontSize: 14,
-        color: COLORS.TEXT,
-    },
-    priceLevelGray: {
-        color: COLORS.GRAY_LIGHT,
-    },
-    address: {
-        fontSize: 14,
-        color: COLORS.TEXT_SECONDARY,
-        marginBottom: 8,
-    },
-    travelInfoContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    travelInfoColumn: {
-        flex: 1,
-    },
-    travelInfoLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: COLORS.TEXT,
-        marginBottom: 4,
-    },
-    travelInfo: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    travelDetail: {
-        fontSize: 14,
-        color: COLORS.TEXT_SECONDARY,
-        marginBottom: 2,
+        marginBottom: 24,
     },
     fairnessBadge: {
         position: 'absolute',
         top: 12,
         right: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-        zIndex: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 14,
     },
     fairnessBadgeText: {
         color: COLORS.SURFACE,
         fontSize: 12,
         fontWeight: '600',
     },
-}); 
+    // --- Content ---
+    contentContainer: {
+        paddingTop: 10,
+        paddingBottom: 4,
+    },
+    name: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.TEXT,
+        marginBottom: 3,
+    },
+    infoLine: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 4,
+    },
+    infoSeparator: {
+        fontSize: 13,
+        color: COLORS.TEXT_SECONDARY,
+    },
+    infoText: {
+        fontSize: 13,
+        color: COLORS.TEXT_SECONDARY,
+    },
+    editorialText: {
+        fontSize: 13,
+        color: COLORS.TEXT_SECONDARY,
+        marginBottom: 4,
+    },
+    openText: {
+        fontSize: 13,
+        color: COLORS.OPEN_TEXT,
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    closedText: {
+        fontSize: 13,
+        color: COLORS.CLOSED_TEXT,
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    // --- Travel chips ---
+    travelRow: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 4,
+    },
+    travelChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        backgroundColor: COLORS.BACKGROUND,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 16,
+    },
+    travelChipText: {
+        fontSize: 12,
+        color: COLORS.TEXT_SECONDARY,
+        fontWeight: '500',
+    },
+});

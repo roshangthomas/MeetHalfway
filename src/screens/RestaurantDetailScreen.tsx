@@ -1,20 +1,56 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Linking, SafeAreaView, Platform, Share, ActivityIndicator } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Linking,
+    SafeAreaView,
+    Share,
+    ActivityIndicator,
+    Dimensions,
+} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
-import { Restaurant, Location, TravelMode } from '../types';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS } from '../constants';
+import { Restaurant, TravelMode } from '../types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { getPlaceDetails } from '../services/places';
+import {
+    logger,
+    isBusinessOpen,
+    getGoogleDayIndex,
+    getDirectionsUrl,
+    getShareUrl,
+    getShareMessage,
+    renderPriceLevelText,
+    getSpecificType,
+    getTodayHours,
+    TRAVEL_MODE_ICONS,
+} from '../utils';
+import { RatingDisplay } from '../components/RatingDisplay';
+import { ImageCarousel } from '../components/ImageCarousel';
+import { useSavedPlaces } from '../hooks/useSavedPlaces';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const HERO_HEIGHT = 280;
 
 type RestaurantDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'RestaurantDetail'>;
 
+const getTravelModeIcon = (mode?: TravelMode): keyof typeof FontAwesome.glyphMap => {
+    return TRAVEL_MODE_ICONS[mode || 'driving'] as keyof typeof FontAwesome.glyphMap;
+};
+
 export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ route, navigation }) => {
-    const { restaurant, userLocation, travelMode = 'driving' } = route.params;
+    const { restaurant, userLocation, partnerLocation, travelMode = 'driving' } = route.params;
     const [detailedRestaurant, setDetailedRestaurant] = useState<Restaurant>(restaurant);
     const [isLoading, setIsLoading] = useState(true);
+    const [hoursExpanded, setHoursExpanded] = useState(false);
+    const { savedIds, toggleSaved } = useSavedPlaces();
 
-    // Fetch place details when the component mounts
+    const isSaved = savedIds.has(restaurant.id);
+
     useEffect(() => {
         const fetchPlaceDetails = async () => {
             try {
@@ -23,10 +59,11 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                 setDetailedRestaurant({
                     ...restaurant,
                     phoneNumber: details.phoneNumber,
-                    businessHours: details.businessHours
+                    businessHours: details.businessHours,
+                    editorialSummary: details.editorialSummary || restaurant.editorialSummary,
                 });
             } catch (error) {
-                console.error('Failed to fetch place details:', error);
+                logger.error('Failed to fetch place details:', error);
             } finally {
                 setIsLoading(false);
             }
@@ -35,106 +72,33 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         fetchPlaceDetails();
     }, [restaurant.id]);
 
-    const renderRatingStars = (rating?: number) => {
-        if (!rating) return null;
-
-        return (
-            <View style={styles.ratingContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                    <FontAwesome
-                        key={star}
-                        name={
-                            star <= rating
-                                ? 'star'
-                                : star - 0.5 <= rating
-                                    ? 'star-half-o'
-                                    : 'star-o'
-                        }
-                        size={18}
-                        color={COLORS.WARNING}
-                        style={styles.star}
-                    />
-                ))}
-                {restaurant.totalRatings && (
-                    <Text style={styles.ratingCount}>({restaurant.totalRatings})</Text>
-                )}
-            </View>
+    const handleGetDirections = () => {
+        const url = getDirectionsUrl(
+            userLocation,
+            { latitude: restaurant.latitude, longitude: restaurant.longitude },
+            travelMode,
+            restaurant.id
+        );
+        Linking.openURL(url).catch(err =>
+            logger.error('An error occurred while opening maps', err)
         );
     };
 
-    const renderPriceLevel = (priceLevel?: number) => {
-        if (!priceLevel) return null;
-        return (
-            <Text style={styles.priceLevel}>
-                {'$'.repeat(priceLevel)}
-                <Text style={styles.priceLevelGray}>
-                    {'$'.repeat(4 - priceLevel)}
-                </Text>
-            </Text>
-        );
-    };
-
-    const getDirections = () => {
-        const destination = `${restaurant.latitude},${restaurant.longitude}`;
-
-        let url;
-        if (Platform.OS === 'ios') {
-            // Use alternative Apple Maps URL scheme for better control of transport mode
-            if (travelMode === 'driving') {
-                // Specific format for driving directions
-                url = `http://maps.apple.com/?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=d`;
-            } else {
-                // Format for other travel modes
-                const dirFlag = getAppleMapsDirectionFlag(travelMode);
-                url = `http://maps.apple.com/?saddr=${userLocation.latitude},${userLocation.longitude}&daddr=${destination}&dirflg=${dirFlag}`;
-            }
-        } else {
-            // Use the Google Maps directions URL to show preview instead of starting navigation directly
-            url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${destination}&travelmode=${travelMode}`;
-
-            // Optional: Add restaurant place ID for better location pinpointing
-            if (restaurant.id) {
-                url += `&destination_place_id=${restaurant.id}`;
-            }
-        }
-
-        if (url) {
-            console.log(`Opening maps with URL: ${url}, travel mode: ${travelMode}`);
-            Linking.openURL(url).catch(err =>
-                console.error('An error occurred while opening maps', err)
-            );
-        }
-    };
-
-    const getAppleMapsDirectionFlag = (mode: TravelMode): string => {
-        switch (mode) {
-            case 'walking':
-                return 'w';
-            case 'transit':
-                return 'r';
-            case 'bicycling':
-                return 'b';
-            case 'driving':
-            default:
-                return 'd';
-        }
-    };
-
-    const shareLocation = async () => {
+    const handleShareLocation = async () => {
         try {
-            const restaurantLocation = `${restaurant.latitude},${restaurant.longitude}`;
-            const mapsUrl = Platform.select({
-                ios: `https://maps.apple.com/?q=${restaurant.name}&ll=${restaurantLocation}`,
-                android: `https://www.google.com/maps/search/?api=1&query=${restaurantLocation}&query_place_id=${restaurant.id}`
-            });
-
+            const mapsUrl = getShareUrl(
+                restaurant.name,
+                { latitude: restaurant.latitude, longitude: restaurant.longitude },
+                restaurant.id
+            );
+            const message = getShareMessage(restaurant.name, restaurant.address, mapsUrl);
             await Share.share({
-                message: `Check out ${restaurant.name} at ${restaurant.address || 'this location'}. ${mapsUrl}`,
-                url: mapsUrl, // iOS only
-                title: `${restaurant.name} Location` // Android only
+                message,
+                url: mapsUrl,
+                title: `${restaurant.name} Location`
             });
         } catch (error) {
-            console.error('Error sharing location:', error);
+            logger.error('Error sharing location:', error);
         }
     };
 
@@ -144,188 +108,228 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
         }
     };
 
-    // Add a function to format and parse business hours
+    const handleOpenAddress = () => {
+        if (detailedRestaurant.address) {
+            const url = `https://maps.apple.com/?q=${encodeURIComponent(detailedRestaurant.address)}`;
+            Linking.openURL(url).catch(err =>
+                logger.error('Error opening address in maps', err)
+            );
+        }
+    };
+
+    // --- Derived data ---
+    const openStatus = isBusinessOpen(detailedRestaurant.businessHours);
+    const priceText = renderPriceLevelText(detailedRestaurant.priceLevel);
+    const specificType = getSpecificType(detailedRestaurant.types);
+    const travelIcon = getTravelModeIcon(travelMode);
+
+    const userDuration = detailedRestaurant.durationA || detailedRestaurant.duration;
+    const userDistance = detailedRestaurant.distanceA || detailedRestaurant.distance;
+    const partnerDuration = detailedRestaurant.durationB;
+    const partnerDistance = detailedRestaurant.distanceB;
+
+    const todayHours = getTodayHours(detailedRestaurant.businessHours);
+
+    // --- Fairness badge ---
+    const renderFairnessBadge = () => {
+        if (detailedRestaurant.timeDifference === undefined) return null;
+
+        let badgeColor: string = COLORS.SUCCESS;
+        let badgeText = 'Very Fair';
+
+        if (detailedRestaurant.timeDifference > 15) {
+            badgeColor = COLORS.ERROR;
+            badgeText = 'Uneven';
+        } else if (detailedRestaurant.timeDifference > 5) {
+            badgeColor = COLORS.WARNING;
+            badgeText = 'Somewhat Fair';
+        }
+
+        return (
+            <View style={[styles.fairnessBadge, { backgroundColor: badgeColor }]}>
+                <Text style={styles.fairnessBadgeText}>{badgeText}</Text>
+            </View>
+        );
+    };
+
+    // --- Business hours ---
     const renderBusinessHours = () => {
         if (!detailedRestaurant.businessHours || detailedRestaurant.businessHours.length === 0) {
             return null;
         }
 
-        // Get current day of week (0 = Sunday, 1 = Monday, etc.)
-        const today = new Date().getDay();
-        // Convert to Google's format (0 = Monday, 6 = Sunday)
-        const googleToday = today === 0 ? 6 : today - 1;
+        const googleToday = getGoogleDayIndex(new Date().getDay());
 
         return (
             <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Business Hours</Text>
-                <View style={styles.hoursContainer}>
-                    {detailedRestaurant.businessHours.map((hourString, index) => {
-                        // Split the day and hours (e.g., "Monday: 9:00 AM – 10:00 PM")
-                        const [day, hours] = hourString.split(': ');
-                        const isToday = index === googleToday;
+                <TouchableOpacity
+                    style={styles.hoursHeader}
+                    onPress={() => setHoursExpanded(!hoursExpanded)}
+                    activeOpacity={0.7}
+                >
+                    <View style={styles.hoursHeaderLeft}>
+                        <FontAwesome name="clock-o" size={16} color={COLORS.TEXT_SECONDARY} />
+                        <Text style={styles.todayHoursText}>
+                            Today: {todayHours}
+                        </Text>
+                    </View>
+                    <View style={styles.hoursToggle}>
+                        <Text style={styles.hoursToggleText}>
+                            {hoursExpanded ? 'Hide' : 'See all'}
+                        </Text>
+                        <FontAwesome
+                            name={hoursExpanded ? 'chevron-up' : 'chevron-down'}
+                            size={12}
+                            color={COLORS.PRIMARY}
+                        />
+                    </View>
+                </TouchableOpacity>
 
-                        return (
-                            <View
-                                key={index}
-                                style={[
-                                    styles.hourRow,
-                                    isToday && styles.todayRow
-                                ]}
-                            >
-                                <Text style={[
-                                    styles.dayText,
-                                    isToday && styles.todayText
-                                ]}>
-                                    {day}
-                                </Text>
-                                <Text style={[
-                                    styles.timeText,
-                                    isToday && styles.todayText
-                                ]}>
-                                    {hours}
-                                </Text>
-                            </View>
-                        );
-                    })}
-                </View>
-            </View>
-        );
-    };
+                {hoursExpanded && (
+                    <View style={styles.hoursContainer}>
+                        {detailedRestaurant.businessHours.map((hourString, index) => {
+                            const [day, hours] = hourString.split(': ');
+                            const isToday = index === googleToday;
 
-    // Function to determine if restaurant is currently open
-    const isRestaurantOpen = (): boolean | null => {
-        if (!detailedRestaurant.businessHours || detailedRestaurant.businessHours.length === 0) {
-            return null; // Unknown status
-        }
-
-        const now = new Date();
-        const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        // Convert to Google's format (0 = Monday, 6 = Sunday)
-        const googleDayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-        // Get hours for today
-        const todayHours = detailedRestaurant.businessHours[googleDayIndex];
-        if (!todayHours || todayHours.includes('Closed')) {
-            return false; // Closed today
-        }
-
-        // Parse hours (e.g., "Monday: 9:00 AM – 10:00 PM")
-        const hoursMatch = todayHours.match(/(\d+:\d+\s*(?:AM|PM))\s*–\s*(\d+:\d+\s*(?:AM|PM))/i);
-        if (!hoursMatch) {
-            return null; // Can't determine
-        }
-
-        const [_, openTime, closeTime] = hoursMatch;
-
-        // Convert current time, open time, and close time to minutes since midnight
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        const openMinutes = convertTimeToMinutes(openTime);
-        const closeMinutes = convertTimeToMinutes(closeTime);
-
-        return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
-    };
-
-    // Helper to convert time string to minutes since midnight
-    const convertTimeToMinutes = (timeStr: string): number => {
-        // Clean up the time string
-        const cleanTimeStr = timeStr.trim().toUpperCase();
-
-        // Parse hours and minutes
-        const [hourMin, period] = cleanTimeStr.split(/\s+/);
-        const [hours, minutes] = hourMin.split(':').map(Number);
-
-        // Convert to 24-hour format
-        let totalHours = hours;
-        if (period === 'PM' && hours < 12) {
-            totalHours += 12;
-        } else if (period === 'AM' && hours === 12) {
-            totalHours = 0;
-        }
-
-        return totalHours * 60 + minutes;
-    };
-
-    // Render open/closed status badge
-    const renderOpenStatusBadge = () => {
-        const openStatus = isRestaurantOpen();
-
-        if (openStatus === null) {
-            return null; // Don't show if we can't determine
-        }
-
-        return (
-            <View style={[
-                styles.statusBadge,
-                openStatus ? styles.openBadge : styles.closedBadge
-            ]}>
-                <Text style={[
-                    styles.statusText,
-                    openStatus ? styles.openText : styles.closedText
-                ]}>
-                    {openStatus ? 'Open' : 'Closed'}
-                </Text>
+                            return (
+                                <View
+                                    key={index}
+                                    style={[
+                                        styles.hourRow,
+                                        isToday && styles.todayRow,
+                                        index === detailedRestaurant.businessHours!.length - 1 && styles.lastHourRow,
+                                    ]}
+                                >
+                                    <Text style={[styles.dayText, isToday && styles.todayDayText]}>
+                                        {day}
+                                    </Text>
+                                    <Text style={[styles.timeText, isToday && styles.todayDayText]}>
+                                        {hours}
+                                    </Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                )}
             </View>
         );
     };
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView style={styles.scrollView}>
-                <Image
-                    source={
-                        detailedRestaurant.photoUrl
-                            ? { uri: detailedRestaurant.photoUrl }
-                            : require('../../assets/placeholder-restaurant.png')
-                    }
-                    style={styles.heroImage}
-                    resizeMode="cover"
-                />
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+                {/* Hero Image Carousel */}
+                <View>
+                    <ImageCarousel
+                        photoUrls={detailedRestaurant.photoUrls}
+                        photoUrl={detailedRestaurant.photoUrl}
+                        height={HERO_HEIGHT}
+                        width={SCREEN_WIDTH}
+                        isSaved={isSaved}
+                        onToggleSave={() => toggleSaved(restaurant.id)}
+                    />
+                </View>
 
+                {/* Content */}
                 <View style={styles.content}>
-                    <View style={styles.nameContainer}>
-                        <Text style={styles.name}>{detailedRestaurant.name}</Text>
-                        {!isLoading && renderOpenStatusBadge()}
+                    {/* Name + Open/Closed badge */}
+                    <View style={styles.nameRow}>
+                        <Text style={styles.name} numberOfLines={2}>{detailedRestaurant.name}</Text>
+                        {!isLoading && openStatus !== null && (
+                            <View style={[
+                                styles.statusBadge,
+                                openStatus ? styles.openBadge : styles.closedBadge
+                            ]}>
+                                <Text style={[
+                                    styles.statusText,
+                                    openStatus ? styles.openText : styles.closedText
+                                ]}>
+                                    {openStatus ? 'Open' : 'Closed'}
+                                </Text>
+                            </View>
+                        )}
                     </View>
 
-                    <View style={styles.ratingRow}>
-                        {renderRatingStars(detailedRestaurant.rating)}
-                        {renderPriceLevel(detailedRestaurant.priceLevel)}
+                    {/* Info line: ★ 4.5 (1092) · $$$$ · Steakhouse */}
+                    <View style={styles.infoLine}>
+                        <RatingDisplay rating={detailedRestaurant.rating} totalRatings={detailedRestaurant.totalRatings} size={15} />
+                        {priceText ? (
+                            <Text style={styles.infoSeparator}> · <Text style={styles.infoText}>{priceText}</Text></Text>
+                        ) : null}
+                        {specificType ? (
+                            <Text style={styles.infoSeparator}> · <Text style={styles.infoText}>{specificType}</Text></Text>
+                        ) : null}
                     </View>
 
-                    {detailedRestaurant.types && (
-                        <View style={styles.tagsContainer}>
-                            {detailedRestaurant.types.slice(0, 3).map((type, index) => (
-                                <View key={index} style={styles.tag}>
-                                    <Text style={styles.tagText}>
-                                        {type.replace(/_/g, ' ')}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
+                    {/* Editorial summary from Google */}
+                    {detailedRestaurant.editorialSummary && (
+                        <Text style={styles.editorialSummary}>
+                            {detailedRestaurant.editorialSummary}
+                        </Text>
                     )}
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Location</Text>
-                        {detailedRestaurant.address && (
-                            <Text style={styles.address}>{detailedRestaurant.address}</Text>
-                        )}
+                    <View style={styles.divider} />
 
-                        <View style={styles.travelInfo}>
-                            {detailedRestaurant.distance && (
-                                <Text style={styles.travelDetail}>
-                                    <FontAwesome name="map-marker" size={16} color={COLORS.PRIMARY} />
-                                    {' ' + detailedRestaurant.distance}
-                                </Text>
-                            )}
-                            {detailedRestaurant.duration && (
-                                <Text style={styles.travelDetail}>
-                                    <FontAwesome name="clock-o" size={16} color={COLORS.PRIMARY} />
-                                    {' ' + detailedRestaurant.duration}
-                                </Text>
-                            )}
-                        </View>
-                    </View>
+                    {/* Travel Comparison Section */}
+                    {userDuration && (
+                        <>
+                            <Text style={styles.sectionTitle}>Travel Comparison</Text>
+                            <View style={styles.travelComparison}>
+                                {/* Your travel */}
+                                <View style={styles.travelCard}>
+                                    <View style={styles.travelCardHeader}>
+                                        <FontAwesome name={travelIcon} size={16} color={COLORS.PRIMARY} />
+                                        <Text style={styles.travelCardLabel}>You</Text>
+                                    </View>
+                                    <Text style={styles.travelCardDuration}>{userDuration}</Text>
+                                    {userDistance && (
+                                        <Text style={styles.travelCardDistance}>{userDistance}</Text>
+                                    )}
+                                </View>
 
+                                {/* Partner travel */}
+                                {partnerDuration && (
+                                    <View style={styles.travelCard}>
+                                        <View style={styles.travelCardHeader}>
+                                            <FontAwesome name={travelIcon} size={16} color={COLORS.SECONDARY} />
+                                            <Text style={styles.travelCardLabel}>Partner</Text>
+                                        </View>
+                                        <Text style={styles.travelCardDuration}>{partnerDuration}</Text>
+                                        {partnerDistance && (
+                                            <Text style={styles.travelCardDistance}>{partnerDistance}</Text>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+
+                            {/* Fairness badge centered below */}
+                            <View style={styles.fairnessBadgeRow}>
+                                {renderFairnessBadge()}
+                            </View>
+
+                            <View style={styles.divider} />
+                        </>
+                    )}
+
+                    {/* Address row - tappable */}
+                    {detailedRestaurant.address && (
+                        <>
+                            <TouchableOpacity
+                                style={styles.addressRow}
+                                onPress={handleOpenAddress}
+                                activeOpacity={0.7}
+                            >
+                                <FontAwesome name="map-marker" size={18} color={COLORS.PRIMARY} style={styles.addressIcon} />
+                                <Text style={styles.addressText} numberOfLines={2}>
+                                    {detailedRestaurant.address}
+                                </Text>
+                                <FontAwesome name="chevron-right" size={14} color={COLORS.GRAY} />
+                            </TouchableOpacity>
+                            <View style={styles.divider} />
+                        </>
+                    )}
+
+                    {/* Business hours / Loading */}
                     {isLoading ? (
                         <View style={styles.loadingContainer}>
                             <ActivityIndicator size="small" color={COLORS.PRIMARY} />
@@ -335,37 +339,59 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
                         <>
                             {renderBusinessHours()}
 
+                            {/* Phone row - tappable */}
                             {detailedRestaurant.phoneNumber && (
-                                <View style={styles.section}>
-                                    <Text style={styles.sectionTitle}>Contact</Text>
-                                    <TouchableOpacity onPress={callRestaurant}>
-                                        <Text style={styles.phoneNumber}>
-                                            <FontAwesome name="phone" size={16} color={COLORS.PRIMARY} />
-                                            {' ' + detailedRestaurant.phoneNumber}
+                                <>
+                                    {detailedRestaurant.businessHours && detailedRestaurant.businessHours.length > 0 && (
+                                        <View style={styles.divider} />
+                                    )}
+                                    <TouchableOpacity
+                                        style={styles.phoneRow}
+                                        onPress={callRestaurant}
+                                        activeOpacity={0.7}
+                                    >
+                                        <FontAwesome name="phone" size={16} color={COLORS.PRIMARY} style={styles.addressIcon} />
+                                        <Text style={styles.phoneText}>
+                                            {detailedRestaurant.phoneNumber}
                                         </Text>
+                                        <FontAwesome name="chevron-right" size={14} color={COLORS.GRAY} />
                                     </TouchableOpacity>
-                                </View>
+                                </>
                             )}
                         </>
                     )}
-
-                    <TouchableOpacity
-                        style={styles.shareButton}
-                        onPress={shareLocation}
-                    >
-                        <FontAwesome name="share-alt" size={18} color={COLORS.SURFACE} />
-                        <Text style={styles.buttonText}>Share Location</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.directionsButton}
-                        onPress={getDirections}
-                    >
-                        <FontAwesome name="map" size={18} color={COLORS.SURFACE} />
-                        <Text style={styles.buttonText}>Get Directions</Text>
-                    </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Sticky Bottom Action Bar */}
+            <View style={styles.bottomBar}>
+                <TouchableOpacity
+                    style={styles.directionsButton}
+                    onPress={handleGetDirections}
+                    activeOpacity={0.8}
+                >
+                    <FontAwesome name="map" size={16} color={COLORS.SURFACE} />
+                    <Text style={styles.directionsButtonText}>Get Directions</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={handleShareLocation}
+                    activeOpacity={0.7}
+                >
+                    <FontAwesome name="share-alt" size={18} color={COLORS.PRIMARY} />
+                </TouchableOpacity>
+
+                {detailedRestaurant.phoneNumber && (
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={callRestaurant}
+                        activeOpacity={0.7}
+                    >
+                        <FontAwesome name="phone" size={18} color={COLORS.PRIMARY} />
+                    </TouchableOpacity>
+                )}
+            </View>
         </SafeAreaView>
     );
 };
@@ -373,196 +399,286 @@ export const RestaurantDetailScreen: React.FC<RestaurantDetailScreenProps> = ({ 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.BACKGROUND,
+        backgroundColor: COLORS.SURFACE,
     },
     scrollView: {
         flex: 1,
     },
-    heroImage: {
-        width: '100%',
-        height: 250,
-        backgroundColor: COLORS.GRAY_LIGHT,
+    scrollContent: {
+        paddingBottom: SPACING.LARGE,
     },
     content: {
-        padding: 20,
+        paddingHorizontal: SPACING.LARGE,
+        paddingTop: SPACING.LARGE,
     },
-    nameContainer: {
+
+    // --- Name + Status ---
+    nameRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 8,
+        alignItems: 'flex-start',
+        marginBottom: SPACING.SMALL,
     },
     name: {
-        fontSize: 24,
+        fontSize: FONT_SIZES.XXL,
         fontWeight: '700',
         color: COLORS.TEXT,
-        flex: 1, // Allow the name to take up most of the space
+        flex: 1,
+        marginRight: SPACING.SMALL,
     },
-    ratingRow: {
+    statusBadge: {
+        paddingHorizontal: SPACING.SMALL,
+        paddingVertical: SPACING.XS,
+        borderRadius: BORDER_RADIUS.XL,
+        marginTop: SPACING.XS,
+    },
+    openBadge: {
+        backgroundColor: COLORS.OPEN_BG,
+    },
+    closedBadge: {
+        backgroundColor: COLORS.CLOSED_BG,
+    },
+    statusText: {
+        fontWeight: '600',
+        fontSize: FONT_SIZES.SMALL,
+    },
+    openText: {
+        color: COLORS.OPEN_TEXT,
+    },
+    closedText: {
+        color: COLORS.CLOSED_TEXT,
+    },
+
+    // --- Info line ---
+    infoLine: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 16,
+        flexWrap: 'wrap',
+        marginBottom: SPACING.MEDIUM,
     },
-    ratingContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    star: {
-        marginRight: 3,
-    },
-    ratingCount: {
-        fontSize: 16,
+    infoSeparator: {
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.TEXT_SECONDARY,
-        marginLeft: 6,
     },
-    priceLevel: {
-        fontSize: 16,
+    infoText: {
+        fontSize: FONT_SIZES.MEDIUM,
+        color: COLORS.TEXT_SECONDARY,
+    },
+
+    // --- Editorial summary ---
+    editorialSummary: {
+        fontSize: FONT_SIZES.MEDIUM,
+        color: COLORS.TEXT_SECONDARY,
+        lineHeight: 20,
+        marginBottom: SPACING.XS,
+    },
+
+    // --- Divider ---
+    divider: {
+        height: 1,
+        backgroundColor: COLORS.GRAY_LIGHT,
+        marginVertical: SPACING.MEDIUM,
+    },
+
+    // --- Section ---
+    section: {
+        marginBottom: SPACING.XS,
+    },
+    sectionTitle: {
+        fontSize: FONT_SIZES.LARGE,
+        fontWeight: '600',
+        color: COLORS.TEXT,
+        marginBottom: SPACING.MEDIUM,
+    },
+
+    // --- Travel Comparison ---
+    travelComparison: {
+        flexDirection: 'row',
+        gap: SPACING.MEDIUM,
+    },
+    travelCard: {
+        flex: 1,
+        backgroundColor: COLORS.BACKGROUND,
+        borderRadius: BORDER_RADIUS.LARGE,
+        padding: SPACING.MEDIUM,
+        alignItems: 'center',
+    },
+    travelCardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.SMALL,
+        marginBottom: SPACING.SMALL,
+    },
+    travelCardLabel: {
+        fontSize: FONT_SIZES.MEDIUM,
+        fontWeight: '600',
+        color: COLORS.TEXT,
+    },
+    travelCardDuration: {
+        fontSize: FONT_SIZES.XL,
+        fontWeight: '700',
+        color: COLORS.TEXT,
+    },
+    travelCardDistance: {
+        fontSize: FONT_SIZES.SMALL,
+        color: COLORS.TEXT_SECONDARY,
+        marginTop: SPACING.XS,
+    },
+    fairnessBadgeRow: {
+        alignItems: 'center',
+        marginTop: SPACING.MEDIUM,
+    },
+    fairnessBadge: {
+        paddingHorizontal: SPACING.MEDIUM,
+        paddingVertical: SPACING.XS,
+        borderRadius: BORDER_RADIUS.XL,
+    },
+    fairnessBadgeText: {
+        color: COLORS.SURFACE,
+        fontSize: FONT_SIZES.SMALL,
+        fontWeight: '600',
+    },
+
+    // --- Address row ---
+    addressRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: SPACING.SMALL,
+    },
+    addressIcon: {
+        width: 24,
+        textAlign: 'center',
+        marginRight: SPACING.MEDIUM,
+    },
+    addressText: {
+        flex: 1,
+        fontSize: FONT_SIZES.MEDIUM,
+        color: COLORS.TEXT,
+        lineHeight: 20,
+    },
+
+    // --- Hours ---
+    hoursHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: SPACING.SMALL,
+    },
+    hoursHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: SPACING.MEDIUM,
+    },
+    todayHoursText: {
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.TEXT,
         fontWeight: '500',
     },
-    priceLevelGray: {
-        color: COLORS.GRAY_LIGHT,
-    },
-    tagsContainer: {
+    hoursToggle: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginBottom: 20,
-        gap: 8,
+        alignItems: 'center',
+        gap: SPACING.XS,
     },
-    tag: {
-        backgroundColor: COLORS.PRIMARY_LIGHT,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-    },
-    tagText: {
+    hoursToggleText: {
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.PRIMARY,
-        fontSize: 14,
-        textTransform: 'capitalize',
-    },
-    section: {
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: COLORS.TEXT,
-        marginBottom: 8,
-    },
-    address: {
-        fontSize: 16,
-        color: COLORS.TEXT_SECONDARY,
-        marginBottom: 12,
-        lineHeight: 22,
-    },
-    travelInfo: {
-        flexDirection: 'row',
-        justifyContent: 'flex-start',
-        gap: 24,
-    },
-    travelDetail: {
-        fontSize: 16,
-        color: COLORS.TEXT_SECONDARY,
-    },
-    directionsButton: {
-        backgroundColor: COLORS.PRIMARY,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 12,
-        gap: 10,
-    },
-    shareButton: {
-        backgroundColor: COLORS.SECONDARY,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 12,
-        gap: 10,
-        marginBottom: 12,
-    },
-    buttonText: {
-        color: COLORS.SURFACE,
-        fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '500',
     },
     hoursContainer: {
-        marginBottom: 12,
-        borderRadius: 8,
-        backgroundColor: COLORS.SURFACE,
+        marginTop: SPACING.SMALL,
+        borderRadius: BORDER_RADIUS.MEDIUM,
+        backgroundColor: COLORS.BACKGROUND,
         overflow: 'hidden',
     },
     hourRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingVertical: 10,
-        paddingHorizontal: 16,
+        paddingVertical: SPACING.SMALL,
+        paddingHorizontal: SPACING.MEDIUM,
         borderBottomWidth: 1,
         borderBottomColor: COLORS.GRAY_LIGHT,
+    },
+    lastHourRow: {
+        borderBottomWidth: 0,
     },
     todayRow: {
         backgroundColor: COLORS.PRIMARY_LIGHT,
     },
     dayText: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.TEXT,
         fontWeight: '500',
         width: '40%',
     },
     timeText: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.TEXT_SECONDARY,
         width: '60%',
         textAlign: 'right',
     },
-    todayText: {
+    todayDayText: {
         color: COLORS.PRIMARY,
         fontWeight: '600',
     },
-    phoneNumber: {
-        fontSize: 16,
-        color: COLORS.PRIMARY,
-        marginVertical: 8,
-        paddingVertical: 10,
-        paddingHorizontal: 16,
-        backgroundColor: COLORS.SURFACE,
-        borderRadius: 8,
+
+    // --- Phone row ---
+    phoneRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingVertical: SPACING.SMALL,
     },
+    phoneText: {
+        flex: 1,
+        fontSize: FONT_SIZES.MEDIUM,
+        color: COLORS.PRIMARY,
+        fontWeight: '500',
+    },
+
+    // --- Loading ---
     loadingContainer: {
-        padding: 16,
+        padding: SPACING.MEDIUM,
         alignItems: 'center',
         justifyContent: 'center',
     },
     loadingText: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.MEDIUM,
         color: COLORS.TEXT_SECONDARY,
-        marginTop: 8,
+        marginTop: SPACING.SMALL,
     },
-    statusBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 16,
-        marginLeft: 8,
+
+    // --- Bottom Bar ---
+    bottomBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: SPACING.LARGE,
+        paddingVertical: SPACING.MEDIUM,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.GRAY_LIGHT,
+        backgroundColor: COLORS.SURFACE,
+        gap: SPACING.SMALL,
     },
-    openBadge: {
-        backgroundColor: 'rgba(39, 174, 96, 0.2)', // Light green background
+    directionsButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: COLORS.PRIMARY,
+        paddingVertical: SPACING.MEDIUM,
+        borderRadius: BORDER_RADIUS.LARGE,
+        gap: SPACING.SMALL,
     },
-    closedBadge: {
-        backgroundColor: 'rgba(231, 76, 60, 0.2)', // Light red background
-    },
-    statusText: {
+    directionsButtonText: {
+        color: COLORS.SURFACE,
+        fontSize: FONT_SIZES.LARGE,
         fontWeight: '600',
-        fontSize: 14,
     },
-    openText: {
-        color: '#27AE60', // Green text
+    iconButton: {
+        width: 48,
+        height: 48,
+        borderRadius: BORDER_RADIUS.LARGE,
+        borderWidth: 1,
+        borderColor: COLORS.GRAY_LIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    closedText: {
-        color: '#E74C3C', // Red text
-    },
-}); 
+});

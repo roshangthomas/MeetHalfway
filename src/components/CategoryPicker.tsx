@@ -1,12 +1,22 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { PlaceCategory, PLACE_CATEGORY_LABELS, MIN_CATEGORIES, MAX_CATEGORIES } from '../types';
-import { COLORS } from '../constants/colors';
+import { COLORS, SPACING, FONT_SIZES, BORDER_RADIUS, SHADOWS } from '../constants';
 
 interface CategoryPickerProps {
     selectedCategories: PlaceCategory[];
     onCategoriesChange: (categories: PlaceCategory[]) => void;
 }
+
+const CATEGORY_ICONS: Record<PlaceCategory, keyof typeof Ionicons.glyphMap> = {
+    restaurant: 'restaurant-outline',
+    cafe: 'cafe-outline',
+    park: 'leaf-outline',
+    bar: 'wine-outline',
+    shopping_mall: 'bag-outline',
+    movie_theater: 'film-outline',
+};
 
 export const CategoryPicker: React.FC<CategoryPickerProps> = ({
     selectedCategories,
@@ -16,12 +26,10 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
 
     const handleToggleCategory = (category: PlaceCategory) => {
         if (selectedCategories.includes(category)) {
-            // Don't allow deselecting if we're at minimum categories
             if (selectedCategories.length > MIN_CATEGORIES) {
                 onCategoriesChange(selectedCategories.filter(c => c !== category));
             }
         } else {
-            // Don't allow selecting if we're at maximum categories
             if (selectedCategories.length < MAX_CATEGORIES) {
                 onCategoriesChange([...selectedCategories, category]);
             }
@@ -30,41 +38,45 @@ export const CategoryPicker: React.FC<CategoryPickerProps> = ({
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Text style={styles.label}>I'm looking for...</Text>
-                <Text style={styles.subtitle}>
-                    Select up to {MAX_CATEGORIES} options
-                </Text>
-            </View>
-            <View style={styles.categoryGrid}>
-                {categories.map((category) => (
-                    <View key={category} style={styles.categoryButton}>
+            <Text style={styles.label}>I'm looking for...</Text>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {categories.map((category) => {
+                    const isSelected = selectedCategories.includes(category);
+                    const isDisabled = selectedCategories.length >= MAX_CATEGORIES && !isSelected;
+                    const iconName = CATEGORY_ICONS[category];
+                    return (
                         <TouchableOpacity
+                            key={category}
                             style={[
-                                styles.categoryButtonInner,
-                                selectedCategories.includes(category) && styles.selectedCategory,
-                                selectedCategories.length >= MAX_CATEGORIES &&
-                                !selectedCategories.includes(category) &&
-                                styles.disabledCategory,
+                                styles.chip,
+                                isSelected && styles.selectedChip,
+                                isDisabled && styles.disabledChip,
                             ]}
                             onPress={() => handleToggleCategory(category)}
-                            disabled={selectedCategories.length >= MAX_CATEGORIES && !selectedCategories.includes(category)}
+                            disabled={isDisabled}
                         >
+                            <Ionicons
+                                name={isSelected ? iconName.replace('-outline', '') as keyof typeof Ionicons.glyphMap : iconName}
+                                size={16}
+                                color={isSelected ? COLORS.SURFACE : isDisabled ? COLORS.TEXT_SECONDARY : COLORS.TEXT}
+                            />
                             <Text
                                 style={[
-                                    styles.categoryText,
-                                    selectedCategories.includes(category) && styles.selectedCategoryText,
-                                    selectedCategories.length >= MAX_CATEGORIES &&
-                                    !selectedCategories.includes(category) &&
-                                    styles.disabledCategoryText,
+                                    styles.chipText,
+                                    isSelected && styles.selectedChipText,
+                                    isDisabled && styles.disabledChipText,
                                 ]}
                             >
                                 {PLACE_CATEGORY_LABELS[category]}
                             </Text>
                         </TouchableOpacity>
-                    </View>
-                ))}
-            </View>
+                    );
+                })}
+            </ScrollView>
         </View>
     );
 };
@@ -73,65 +85,42 @@ const styles = StyleSheet.create({
     container: {
         marginBottom: 10,
     },
-    headerContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'baseline',
-        marginBottom: 8,
-        marginHorizontal: 4,
-    },
     label: {
-        fontSize: 16,
+        fontSize: FONT_SIZES.MEDIUM,
         fontWeight: '600',
         color: COLORS.TEXT,
+        marginBottom: SPACING.SMALL,
+        marginHorizontal: SPACING.XS,
     },
-    subtitle: {
-        fontSize: 12,
-        color: COLORS.TEXT_SECONDARY,
-        fontStyle: 'italic',
-    },
-    categoryGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: -2,
-    },
-    categoryButton: {
-        width: '50%',
+    scrollContent: {
         paddingHorizontal: 2,
-        paddingVertical: 2,
+        gap: SPACING.SMALL,
     },
-    categoryButtonInner: {
-        backgroundColor: COLORS.SURFACE,
-        paddingVertical: 8,
-        paddingHorizontal: 6,
-        borderRadius: 10,
+    chip: {
+        flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: COLORS.TEXT,
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
+        backgroundColor: COLORS.SURFACE,
+        paddingVertical: SPACING.SMALL,
+        paddingHorizontal: 12,
+        borderRadius: 20,
+        gap: 6,
+        ...SHADOWS.SMALL,
     },
-    selectedCategory: {
+    selectedChip: {
         backgroundColor: COLORS.PRIMARY,
     },
-    disabledCategory: {
+    disabledChip: {
         opacity: 0.5,
     },
-    categoryText: {
+    chipText: {
         fontSize: 13,
         color: COLORS.TEXT,
-        textAlign: 'center',
     },
-    selectedCategoryText: {
+    selectedChipText: {
         color: COLORS.SURFACE,
         fontWeight: '600',
     },
-    disabledCategoryText: {
+    disabledChipText: {
         color: COLORS.TEXT_SECONDARY,
     },
-}); 
+});
